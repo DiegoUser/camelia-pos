@@ -6,8 +6,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QIcon
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QListWidget, QListWidgetItem, QListWidget, QLineEdit, QScrollArea, QListWidgetItem,
-    QFileDialog, QMessageBox, QSplitter, QComboBox
+    QListWidget, QListWidgetItem, QLineEdit, QScrollArea, QFileDialog,
+    QMessageBox, QSplitter, QComboBox
 )
 
 # --- Rutas base ---
@@ -27,8 +27,7 @@ def bootstrap_products_csv():
     if not PRODS_CSV.exists():
         rows = [
             ["item_id","item_desc","categoria","precio","activo","imagen"],
-            ["CAF_CHICO","Café chico","Bebidas","120.00","1", str(ASSETS_DIR / "cafe_chico.jpg")],
-            ["MED_2U","Medialunas x2","Panadería","250.00","1", str(ASSETS_DIR / "medialunas.jpg")],
+            ["no_hay_datos","No hay datos","Miscelaneo","999.99","0", str(ASSETS_DIR / "not_found.png")],
         ]
         with open(PRODS_CSV, "w", encoding="utf-8", newline="") as f:
             csv.writer(f).writerows(rows)
@@ -56,7 +55,7 @@ def current_sales_path():
         with open(p, "w", encoding="utf-8", newline="") as f:
             f.write("fecha_hora,ticket_id,item_id,item_desc,categoria,cantidad,precio_unit,subtotal,medio_pago,cajero,nota\n")
     return p
-    
+
 def last_ticket_id_from_csv(csv_path: Path) -> int:
     """Lee el último ticket_id del CSV (si existe) y retorna el siguiente."""
     if not csv_path.exists():
@@ -65,7 +64,6 @@ def last_ticket_id_from_csv(csv_path: Path) -> int:
     try:
         with open(csv_path, "r", encoding="utf-8") as f:
             for line in f:
-                # ticket_id está en la 2da columna
                 parts = line.rstrip("\n").split(",")
                 if len(parts) > 1 and parts[0] != "fecha_hora":
                     try:
@@ -96,10 +94,12 @@ class ProductCard(QPushButton):
             pix = QPixmap(str(img_path)).scaled(160, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             lbl = QLabel(); lbl.setPixmap(pix); lbl.setAlignment(Qt.AlignCenter)
             v.addWidget(lbl, alignment=Qt.AlignCenter)
-        name = QLabel(prod["item_desc"]); price = QLabel(f"${prod['precio']:,.2f}")
+        name = QLabel(prod["item_desc"])
+        price = QLabel(f"${prod['precio']:,.2f}")
         v.addWidget(name); v.addWidget(price)
         self.clicked.connect(lambda: on_add(prod, 1))
 
+# --- App principal ---
 class POS(QWidget):
     def __init__(self):
         super().__init__()
@@ -113,24 +113,9 @@ class POS(QWidget):
         sales_csv = current_sales_path()
         self.ticket_id = last_ticket_id_from_csv(sales_csv)
 
-        # ----- Sidebar de categorías -----
-        self.categories = ["Todas"] + sorted({p["categoria"] for p in self.prods})
-        self.cat_list = QListWidget()
-        for c in self.categories:
-            QListWidgetItem(c, self.cat_list)
-        self.cat_list.setFixedWidth(200)
-        self.cat_list.setSelectionMode(QListWidget.SingleSelection)
-        self.cat_list.currentTextChanged.connect(self.apply_filters)
-        self.cat_list.setCurrentRow(0)
-
-        self.cat_list.setStyleSheet("""
-            QListWidget { background:#272727; color:#ddd; border:0; }
-            QListWidget::item { padding:10px; margin:6px; border-radius:10px; }
-            QListWidget::item:selected { background:#585858; color:white; }
-        """)
-
-        # ----- Buscador -----
-        self.search = QLineEdit(); self.search.setPlaceholderText("Buscar producto…")
+        # ----- Buscador (definido ANTES de señales) -----
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Buscar producto…")
         self.search.textChanged.connect(self.apply_filters)
         self.search.setStyleSheet("""
             QLineEdit {
@@ -139,9 +124,23 @@ class POS(QWidget):
             }
         """)
 
+        # ----- Sidebar de categorías -----
+        self.categories = ["Todas"] + sorted({p["categoria"] for p in self.prods})
+        self.cat_list = QListWidget()
+        for c in self.categories:
+            QListWidgetItem(c, self.cat_list)
+        self.cat_list.setFixedWidth(200)
+        self.cat_list.setSelectionMode(QListWidget.SingleSelection)
+        self.cat_list.setStyleSheet("""
+            QListWidget { background:#272727; color:#ddd; border:0; }
+            QListWidget::item { padding:10px; margin:6px; border-radius:10px; }
+            QListWidget::item:selected { background:#585858; color:white; }
+        """)
+
         # ----- Grilla de productos (scroll) -----
         self.grid = QGridLayout()
-        self.grid.setHorizontalSpacing(16); self.grid.setVerticalSpacing(16)
+        self.grid.setHorizontalSpacing(16)
+        self.grid.setVerticalSpacing(16)
 
         grid_wrap = QWidget(); grid_wrap.setLayout(self.grid)
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(grid_wrap)
@@ -152,8 +151,10 @@ class POS(QWidget):
         self.ticket_list.setStyleSheet("""
             QListWidget { background:#2b2b2b; color:#e6e6e6; border:1px solid #3a3a3a; border-radius:8px; }
         """)
+
         self.mpago = QComboBox()
         self.mpago.addItems(["Efectivo", "Tarjeta", "QR", "Débito"])
+
         self.total_lbl = QLabel("Total: $0.00")
         self.total_lbl.setAlignment(Qt.AlignRight)
         self.total_lbl.setStyleSheet("color:#ddd; padding:8px;")
@@ -162,8 +163,10 @@ class POS(QWidget):
         btn_export = QPushButton("Exportar a Excel"); btn_export.clicked.connect(self.export_excel)
         for b in (btn_cobrar, btn_export):
             b.setMinimumHeight(36)
-            b.setStyleSheet("QPushButton { background:#7a2cff; color:white; border:0; border-radius:8px; padding:8px; }"
-                            "QPushButton:hover { background:#8b49ff; }")
+            b.setStyleSheet(
+                "QPushButton { background:#7a2cff; color:white; border:0; border-radius:8px; padding:8px; }"
+                "QPushButton:hover { background:#8b49ff; }"
+            )
 
         # ----- Layouts -----
         left_panel = QVBoxLayout(); left_panel.addWidget(self.cat_list)
@@ -186,20 +189,24 @@ class POS(QWidget):
         splitter.addWidget(left_widget)
         splitter.addWidget(center_widget)
         splitter.addWidget(right_widget)
-        splitter.setStretchFactor(0, 0)  # sidebar
-        splitter.setStretchFactor(1, 1)  # grid
-        splitter.setStretchFactor(2, 0)  # ticket
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 0)
 
         root = QHBoxLayout(self)
         root.addWidget(splitter)
 
         self.setStyleSheet("QWidget { background:#1b1b1b; color:#e0e0e0; }")
+
+        # Conectar señales después de crear todo
+        self.cat_list.currentTextChanged.connect(self.apply_filters)
+        self.cat_list.setCurrentRow(0)
         self.render_products(self.prods)
 
     # ---- Render y filtros ----
     def apply_filters(self):
         cat = self.cat_list.currentItem().text() if self.cat_list.currentItem() else "Todas"
-        text = self.search.text().strip().lower()
+        text = self.search.text().strip().lower() if hasattr(self, "search") else ""
 
         items = self.prods
         if cat != "Todas":
@@ -209,11 +216,9 @@ class POS(QWidget):
         self.render_products(items)
 
     def render_products(self, items):
-        # limpiar grid
         for i in reversed(range(self.grid.count())):
             w = self.grid.itemAt(i).widget()
             if w: w.setParent(None)
-        # repintar
         cols = 4
         for idx, p in enumerate(items):
             r, c = divmod(idx, cols)
@@ -221,7 +226,6 @@ class POS(QWidget):
 
     # ---- Ticket ----
     def add_item(self, prod, cant):
-        # Si ya existe el mismo item, acumula
         for it in self.ticket:
             if it["prod"]["item_id"] == prod["item_id"]:
                 it["cant"] += cant
@@ -251,7 +255,6 @@ class POS(QWidget):
         medio = self.mpago.currentText() if hasattr(self, "mpago") else "Efectivo"
 
         try:
-            # Abrimos en append y forzamos a disco
             with open(path, "a", encoding="utf-8", newline="") as f:
                 w = csv.writer(f)
                 for it in self.ticket:
@@ -269,9 +272,7 @@ class POS(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Cobrar", f"Error al guardar:\n{e}")
 
-
     def export_excel(self):
-        """Convierte el CSV del mes a .xlsx con pandas."""
         try:
             import pandas as pd
         except Exception:
@@ -290,7 +291,6 @@ class POS(QWidget):
 
         try:
             df = pd.read_csv(src, encoding="utf-8")
-            # opcional: totales por categoría en otra hoja
             with pd.ExcelWriter(dest_path, engine="openpyxl") as writer:
                 df.to_excel(writer, index=False, sheet_name="Ventas")
                 try:
@@ -302,7 +302,10 @@ class POS(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Exportar", f"Error exportando:\n{e}")
 
+# --- Entry point ---
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    w = POS(); w.resize(1200, 720); w.show()
+    w = POS()
+    w.resize(1200, 720)
+    w.show()
     sys.exit(app.exec())
