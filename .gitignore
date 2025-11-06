@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Build (PyInstaller)
+build/
+dist/
+*.spec
+
+# Datos locales
+data/historial/
+!data/historial/.gitkeep
+
+# Logs
+*.log
