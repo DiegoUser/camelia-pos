@@ -20,7 +20,8 @@ Aplicacion de escritorio desarrollada en **Python + PySide6**, con persistencia 
 - Registro de errores en `logs.txt` (con traceback) para soporte rapido.
 - Indicador de estado permanente (exito/error) visible para el cajero.
 - Codigo rapido / lector: escribir `ITEM_ID` o `ITEM_ID*3` y Enter.
-- Atajos: `Ctrl+Enter` (cobrar), `Ctrl+E` (exportar), `Ctrl+R` (resumen), `Ctrl+L` (codigo rapido).
+- Atajos: `Ctrl+Enter` (cobrar), `Ctrl+E` (exportar), `Ctrl+R` (resumen), `Ctrl+L` (codigo rapido), `F11` (modo kiosco), `Esc` (salir de kiosco).
+- Modo kiosco a pantalla completa (boton dedicado o tecla `F11`, salir con `Esc`).
 - IDs de ticket continuos entre sesiones.
 - Ejecutable portable (PyInstaller).
 

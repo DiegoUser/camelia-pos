@@ -2,7 +2,7 @@
 import sys, os, csv, datetime, traceback, shutil
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -196,6 +196,8 @@ class POS(QWidget):
         self.current_day = datetime.date.today()
         self.last_backup_signature = None
         self.shortcuts = []
+        self.settings = QSettings("AvocadoPOS", "CafeteriaPOS")
+        self.kiosk_enabled = self.settings.value("kiosk_enabled", False, type=bool)
         self.refresh_sales_target(force=True)
         self.generate_daily_summary(self.current_day - datetime.timedelta(days=1), mode="auto")
 
@@ -255,7 +257,11 @@ class POS(QWidget):
         btn_cobrar = QPushButton("Cobrar"); btn_cobrar.clicked.connect(self.checkout)
         btn_export = QPushButton("Exportar a Excel"); btn_export.clicked.connect(self.export_excel)
         btn_resumen = QPushButton("Resumen diario"); btn_resumen.clicked.connect(self.manual_daily_summary)
-        for b in (btn_cobrar, btn_export, btn_resumen):
+        btn_kiosk = QPushButton("Modo kiosco"); btn_kiosk.setCheckable(True)
+        btn_kiosk.setChecked(self.kiosk_enabled)
+        btn_kiosk.toggled.connect(self.set_kiosk_state)
+        self.btn_kiosk = btn_kiosk
+        for b in (btn_cobrar, btn_export, btn_resumen, btn_kiosk):
             b.setMinimumHeight(36)
             b.setStyleSheet(
                 "QPushButton { background:#7a2cff; color:white; border:0; border-radius:8px; padding:8px; }"
@@ -279,6 +285,7 @@ class POS(QWidget):
         right.addWidget(QLabel("Medio de pago"))
         right.addWidget(self.mpago)
         right.addWidget(btn_resumen)
+        right.addWidget(btn_kiosk)
         right.addWidget(btn_export)
         right.addWidget(btn_cobrar)
         right_widget = QWidget(); right_widget.setLayout(right)
@@ -305,6 +312,8 @@ class POS(QWidget):
         if self.prods_errors:
             self.show_validation_errors(self.prods_errors)
         self.setup_shortcuts()
+        if self.kiosk_enabled:
+            self.apply_kiosk_mode()
 
     # ---- Render y filtros ----
     def apply_filters(self):
@@ -334,6 +343,8 @@ class POS(QWidget):
             ("Ctrl+E", self.export_excel),
             ("Ctrl+R", self.manual_daily_summary),
             ("Ctrl+L", self.focus_code_input),
+            ("F11", self.toggle_kiosk),
+            ("Esc", self.exit_kiosk_if_needed),
         ]
         for seq, handler in mappings:
             sc = QShortcut(QKeySequence(seq), self)
@@ -366,6 +377,29 @@ class POS(QWidget):
             return
         self.add_item(prod, qty, keep_status=True)
         self.set_status(f"{qty} x {prod['item_desc']} agregado por codigo.", "success")
+
+    def toggle_kiosk(self):
+        self.set_kiosk_state(not self.kiosk_enabled)
+
+    def set_kiosk_state(self, state: bool):
+        self.kiosk_enabled = bool(state)
+        self.btn_kiosk.setChecked(self.kiosk_enabled)
+        self.settings.setValue("kiosk_enabled", self.kiosk_enabled)
+        self.apply_kiosk_mode()
+
+    def exit_kiosk_if_needed(self):
+        if self.kiosk_enabled:
+            self.set_kiosk_state(False)
+
+    def apply_kiosk_mode(self):
+        if self.kiosk_enabled:
+            self.showFullScreen()
+            self.setCursor(Qt.ArrowCursor)
+            self.set_status("Modo kiosco activo (F11 para salir).", "info")
+        else:
+            self.showNormal()
+            self.setCursor(Qt.ArrowCursor)
+            self.set_status("Modo kiosco desactivado.", "info")
 
     # ---- Ticket ----
     def add_item(self, prod, cant, keep_status=False):
