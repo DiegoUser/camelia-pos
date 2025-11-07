@@ -11,11 +11,22 @@ from PySide6.QtWidgets import (
 )
 
 # --- Rutas base ---
-BASE_DIR   = Path(__file__).parent
-DATA_DIR   = BASE_DIR / "data"
-ASSETS_DIR = BASE_DIR / "assets"
+def resolve_app_dirs():
+    """Return (app_dir, resource_dir) for script/frozen modes."""
+    if getattr(sys, "frozen", False):
+        app_root = Path(sys.executable).parent
+        resource_root = Path(getattr(sys, "_MEIPASS", app_root))
+    else:
+        app_root = Path(__file__).parent
+        resource_root = app_root
+    return app_root, resource_root
+
+
+APP_DIR, RESOURCE_DIR = resolve_app_dirs()
+DATA_DIR   = APP_DIR / "data"
+ASSETS_DIR = APP_DIR / "assets"
 PRODS_CSV  = DATA_DIR / "productos.csv"
-LOG_FILE   = BASE_DIR / "logs.txt"
+LOG_FILE   = APP_DIR / "logs.txt"
 BACKUP_DIR = DATA_DIR / "historial" / "backups"
 SUMMARY_DIR = DATA_DIR / "historial" / "resumenes"
 
@@ -46,10 +57,22 @@ def log_error(message: str, exc: Exception | None = None):
         pass
 
 # --- Utilidades de datos ---
+def ensure_runtime_payload():
+    """In modo frozen copiamos assets/data junto al exe si faltan."""
+    if RESOURCE_DIR == APP_DIR:
+        return
+    for folder in ("assets", "data"):
+        src = RESOURCE_DIR / folder
+        dest = APP_DIR / folder
+        if src.exists() and not dest.exists():
+            shutil.copytree(src, dest)
+
+
 def ensure_dirs():
+    ensure_runtime_payload()
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     hist_dir = DATA_DIR / "historial"
     hist_dir.mkdir(parents=True, exist_ok=True)
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     SUMMARY_DIR.mkdir(parents=True, exist_ok=True)

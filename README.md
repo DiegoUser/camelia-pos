@@ -64,10 +64,10 @@ python main.py
 
 ```bash
 pip install pyinstaller
-pyinstaller --onefile --noconsole --add-data "data;data" --add-data "assets;assets" main.py
+pyinstaller --name Avocado --onefile --noconsole --add-data "data;data" --add-data "assets;assets" main.py
 ```
 
-4. Logs de errores: se generan automaticamente en `logs.txt` junto al `main.py`. El archivo queda creado desde el arranque para que el staff lo pueda compartir ante incidentes.
+4. Logs de errores: se generan automaticamente en `logs.txt` junto al ejecutable (o en la carpeta donde se copie el `.exe`). El archivo queda creado desde el arranque para que el staff lo pueda compartir ante incidentes. Todos los archivos (data/, assets/, backups, resumenes) se crean en la misma carpeta del ejecutable para facilitar su respaldo.
 
 ---
 
