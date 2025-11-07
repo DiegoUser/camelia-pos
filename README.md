@@ -64,7 +64,7 @@ python main.py
 
 ```bash
 pip install pyinstaller
-pyinstaller --clean --name Avocado --onefile --noconsole --icon assets/icono.ico --add-data "data;data" --add-data "assets;assets" main.py
+pyinstaller --clean --name Avocado --onefile --noconsole --icon assets/icono.ico --add-data "data;data" --add-data "assets;assets" --version-file version_info.txt main.py
 ```
 
 4. Logs de errores: se generan automaticamente en `logs.txt` junto al ejecutable (o en la carpeta donde se copie el `.exe`). El archivo queda creado desde el arranque para que el staff lo pueda compartir ante incidentes. Todos los archivos (data/, assets/, backups, resumenes) se crean en la misma carpeta del ejecutable para facilitar su respaldo.
@@ -106,5 +106,5 @@ pyinstaller --clean --name Avocado --onefile --noconsole --icon assets/icono.ico
 
 Desarrollado como prototipo para gestion de caja en cafeterias locales.
 Autor: *[Diego Mendez]*
-Version: **MVP 0.9**
+Version: **MVP 1.0**
 
