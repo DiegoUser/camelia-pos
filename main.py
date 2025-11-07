@@ -3,7 +3,7 @@ import sys, os, csv, datetime, traceback, shutil
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QIcon
+from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QListWidget, QListWidgetItem, QLineEdit, QScrollArea, QFileDialog,
@@ -17,6 +17,7 @@ ASSETS_DIR = BASE_DIR / "assets"
 PRODS_CSV  = DATA_DIR / "productos.csv"
 LOG_FILE   = BASE_DIR / "logs.txt"
 BACKUP_DIR = DATA_DIR / "historial" / "backups"
+SUMMARY_DIR = DATA_DIR / "historial" / "resumenes"
 
 
 def ensure_log_file():
@@ -51,6 +52,7 @@ def ensure_dirs():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    SUMMARY_DIR.mkdir(parents=True, exist_ok=True)
 
 def bootstrap_products_csv():
     """Crea un productos.csv de ejemplo si no existe."""
@@ -104,6 +106,9 @@ def current_sales_path():
             f.write("fecha_hora,ticket_id,item_id,item_desc,categoria,cantidad,precio_unit,subtotal,medio_pago,cajero,nota\n")
     return p
 
+def sales_path_for_date(target_date: datetime.date) -> Path:
+    return DATA_DIR / "historial" / f"ventas_{target_date:%Y-%m}.csv"
+
 def last_ticket_id_from_csv(csv_path: Path) -> int:
     """Lee el último ticket_id del CSV (si existe) y retorna el siguiente."""
     if not csv_path.exists():
@@ -145,7 +150,7 @@ class ProductCard(QPushButton):
         name = QLabel(prod["item_desc"])
         price = QLabel(f"${prod['precio']:,.2f}")
         v.addWidget(name); v.addWidget(price)
-        self.clicked.connect(lambda: on_add(prod, 1))
+        self.clicked.connect(lambda: on_add(prod, 1, False))
 
 # --- App principal ---
 class POS(QWidget):
@@ -165,8 +170,11 @@ class POS(QWidget):
         )
         self.sales_path = None
         self.current_period = None
+        self.current_day = datetime.date.today()
         self.last_backup_signature = None
+        self.shortcuts = []
         self.refresh_sales_target(force=True)
+        self.generate_daily_summary(self.current_day - datetime.timedelta(days=1), mode="auto")
 
         # ----- Buscador (definido ANTES de señales) -----
         self.search = QLineEdit()
@@ -210,13 +218,21 @@ class POS(QWidget):
         self.mpago = QComboBox()
         self.mpago.addItems(["Efectivo", "Tarjeta", "QR", "Debito"])
 
+        self.code_input = QLineEdit()
+        self.code_input.setPlaceholderText("Codigo rapido (ID o ID*3) y Enter")
+        self.code_input.returnPressed.connect(self.handle_code_entry)
+        self.code_input.setStyleSheet(
+            "QLineEdit { background:#1f1f1f; color:#ddd; border:1px solid #3a3a3a; border-radius:8px; padding:6px; }"
+        )
+
         self.total_lbl = QLabel("Total: $0.00")
         self.total_lbl.setAlignment(Qt.AlignRight)
         self.total_lbl.setStyleSheet("color:#ddd; padding:8px;")
 
         btn_cobrar = QPushButton("Cobrar"); btn_cobrar.clicked.connect(self.checkout)
         btn_export = QPushButton("Exportar a Excel"); btn_export.clicked.connect(self.export_excel)
-        for b in (btn_cobrar, btn_export):
+        btn_resumen = QPushButton("Resumen diario"); btn_resumen.clicked.connect(self.manual_daily_summary)
+        for b in (btn_cobrar, btn_export, btn_resumen):
             b.setMinimumHeight(36)
             b.setStyleSheet(
                 "QPushButton { background:#7a2cff; color:white; border:0; border-radius:8px; padding:8px; }"
@@ -234,9 +250,12 @@ class POS(QWidget):
         right.addWidget(QLabel("Ticket actual"))
         right.addWidget(self.ticket_list, 1)
         right.addWidget(self.total_lbl)
+        right.addWidget(QLabel("Codigo rapido / lector"))
+        right.addWidget(self.code_input)
         right.addWidget(self.status_lbl)
         right.addWidget(QLabel("Medio de pago"))
         right.addWidget(self.mpago)
+        right.addWidget(btn_resumen)
         right.addWidget(btn_export)
         right.addWidget(btn_cobrar)
         right_widget = QWidget(); right_widget.setLayout(right)
@@ -262,6 +281,7 @@ class POS(QWidget):
         self.ensure_daily_backup()
         if self.prods_errors:
             self.show_validation_errors(self.prods_errors)
+        self.setup_shortcuts()
 
     # ---- Render y filtros ----
     def apply_filters(self):
@@ -284,15 +304,55 @@ class POS(QWidget):
             r, c = divmod(idx, cols)
             self.grid.addWidget(ProductCard(p, self.add_item), r, c)
 
+    def setup_shortcuts(self):
+        mappings = [
+            ("Ctrl+Enter", self.checkout),
+            ("Ctrl+Return", self.checkout),
+            ("Ctrl+E", self.export_excel),
+            ("Ctrl+R", self.manual_daily_summary),
+            ("Ctrl+L", self.focus_code_input),
+        ]
+        for seq, handler in mappings:
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.activated.connect(handler)
+            self.shortcuts.append(sc)
+
+    def focus_code_input(self):
+        self.code_input.setFocus()
+        self.code_input.selectAll()
+
+    def handle_code_entry(self):
+        raw = self.code_input.text().strip()
+        if not raw:
+            return
+        self.code_input.clear()
+        qty = 1
+        code = raw
+        for sep in ("*", "x", "X"):
+            if sep in raw:
+                left, right = raw.split(sep, 1)
+                code = left.strip()
+                try:
+                    qty = max(1, int(right.strip()))
+                except Exception:
+                    qty = 1
+                break
+        prod = next((p for p in self.prods if p["item_id"].lower() == code.lower()), None)
+        if not prod:
+            self.set_status(f"Codigo {code} no encontrado.", "warning")
+            return
+        self.add_item(prod, qty, keep_status=True)
+        self.set_status(f"{qty} x {prod['item_desc']} agregado por codigo.", "success")
+
     # ---- Ticket ----
-    def add_item(self, prod, cant):
+    def add_item(self, prod, cant, keep_status=False):
         for it in self.ticket:
             if it["prod"]["item_id"] == prod["item_id"]:
                 it["cant"] += cant
-                self.refresh_ticket()
+                self.refresh_ticket(keep_status=keep_status)
                 return
         self.ticket.append({"prod": prod, "cant": cant})
-        self.refresh_ticket()
+        self.refresh_ticket(keep_status=keep_status)
 
     def refresh_ticket(self, keep_status=False):
         self.ticket_list.clear()
@@ -353,6 +413,7 @@ class POS(QWidget):
                     f"Nuevo periodo detectado ({period}). Ticket #{self.ticket_id:06d}",
                     "info",
                 )
+        self.check_day_rollover()
 
     def ensure_daily_backup(self, notify=True):
         if not self.sales_path or not self.sales_path.exists():
@@ -373,6 +434,119 @@ class POS(QWidget):
         except Exception as exc:
             log_error("Error creando backup diario.", exc)
             self.set_status("No se pudo crear el backup diario.", "warning")
+
+    def check_day_rollover(self):
+        today = datetime.date.today()
+        if self.current_day is None:
+            self.current_day = today
+            return
+        if today != self.current_day:
+            previous = self.current_day
+            self.current_day = today
+            ok, detail = self.generate_daily_summary(previous, mode="auto")
+            if ok:
+                self.set_status(f"Resumen automatico de {previous} generado.", "success")
+            else:
+                self.set_status(f"Resumen automatico pendiente: {detail}", "warning")
+
+    def manual_daily_summary(self):
+        ok, detail = self.generate_daily_summary(datetime.date.today(), mode="manual")
+        if ok:
+            QMessageBox.information(self, "Resumen diario", f"Generado en:\n{detail}")
+            self.set_status(f"Resumen manual creado ({Path(detail).name}).", "success")
+        else:
+            QMessageBox.warning(self, "Resumen diario", detail)
+            self.set_status(detail, "warning")
+
+    def generate_daily_summary(self, target_date: datetime.date, mode="auto"):
+        if target_date is None:
+            return False, "Fecha invalida."
+        today = datetime.date.today()
+        if mode == "auto" and target_date >= today:
+            return False, "El resumen automatico se genera al cierre del dia."
+        sales_csv = sales_path_for_date(target_date)
+        if not sales_csv.exists():
+            return False, f"No hay ventas registradas para {target_date}."
+
+        rows = []
+        with open(sales_csv, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    row_date = datetime.datetime.strptime(row["fecha_hora"], "%Y-%m-%d %H:%M:%S").date()
+                except Exception:
+                    continue
+                if row_date == target_date:
+                    rows.append(row)
+        if not rows:
+            return False, f"No se encontraron ventas el {target_date}."
+
+        totals_by_cat = {}
+        totals_by_pay = {}
+        tickets = set()
+        total_amount = 0.0
+        total_items = 0
+        for row in rows:
+            try:
+                subtotal = float(row.get("subtotal", 0) or 0)
+            except Exception:
+                subtotal = 0.0
+            try:
+                qty = int(row.get("cantidad", 0) or 0)
+            except Exception:
+                qty = 0
+            categoria = row.get("categoria", "Sin categoria") or "Sin categoria"
+            totals_by_cat[categoria] = totals_by_cat.get(categoria, 0.0) + subtotal
+            medio = row.get("medio_pago", "N/D") or "N/D"
+            totals_by_pay[medio] = totals_by_pay.get(medio, 0.0) + subtotal
+            tickets.add(row.get("ticket_id"))
+            total_amount += subtotal
+            total_items += qty
+
+        try:
+            import pandas as pd
+        except Exception:
+            return False, "Instala pandas y openpyxl para generar el resumen."
+
+        df = pd.DataFrame(rows)
+        df["subtotal"] = pd.to_numeric(df.get("subtotal"), errors="coerce").fillna(0.0)
+        df["cantidad"] = pd.to_numeric(df.get("cantidad"), errors="coerce").fillna(0)
+        if "categoria" not in df:
+            df["categoria"] = "Sin categoria"
+        else:
+            df["categoria"] = df["categoria"].fillna("Sin categoria")
+        if "medio_pago" not in df:
+            df["medio_pago"] = "N/D"
+        else:
+            df["medio_pago"] = df["medio_pago"].fillna("N/D")
+
+        meta = pd.DataFrame(
+            [
+                ("fecha", target_date.isoformat()),
+                ("tickets", len(tickets)),
+                ("items", int(df["cantidad"].sum())),
+                ("total", float(df["subtotal"].sum())),
+            ],
+            columns=["metrica", "valor"],
+        )
+        cat_df = df.groupby("categoria")[["subtotal"]].sum().reset_index()
+        pay_df = df.groupby("medio_pago")[["subtotal"]].sum().reset_index()
+
+        base_name = f"resumen_{target_date:%Y-%m-%d}_{mode}"
+        xlsx_path = SUMMARY_DIR / f"{base_name}.xlsx"
+        existed = xlsx_path.exists()
+
+        with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
+            meta.to_excel(writer, index=False, sheet_name="Resumen")
+            cat_df.to_excel(writer, index=False, sheet_name="Por categoria")
+            pay_df.to_excel(writer, index=False, sheet_name="Por medio")
+            df.to_excel(writer, index=False, sheet_name="Detalle")
+
+        log_error(
+            f"Resumen diario {mode} generado para {target_date}: {xlsx_path} "
+            f"({'actualizado' if existed else 'nuevo'})"
+        )
+        return True, str(xlsx_path)
 
     def confirm_checkout(self, total, medio):
         lines = [f"{it['cant']} x {it['prod']['item_desc']}" for it in self.ticket]

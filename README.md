@@ -15,9 +15,12 @@ Aplicacion de escritorio desarrollada en **Python + PySide6**, con persistencia 
 - Control automatico del CSV mensual (detecta cambio de mes y reinicia IDs).
 - Persistencia de ventas en archivos CSV mensuales.
 - Backup diario del CSV activo en `data/historial/backups`.
+- Resumen automatico de fin de dia (Excel) con boton manual.
 - Exportacion a Excel (.xlsx) con hoja de resumen por categoria.
 - Registro de errores en `logs.txt` (con traceback) para soporte rapido.
 - Indicador de estado permanente (exito/error) visible para el cajero.
+- Codigo rapido / lector: escribir `ITEM_ID` o `ITEM_ID*3` y Enter.
+- Atajos: `Ctrl+Enter` (cobrar), `Ctrl+E` (exportar), `Ctrl+R` (resumen), `Ctrl+L` (codigo rapido).
 - IDs de ticket continuos entre sesiones.
 - Ejecutable portable (PyInstaller).
 
@@ -34,6 +37,8 @@ app/
 |       +-- ventas_YYYY-MM.csv
 |       +-- backups/
 |           +-- ventas_YYYY-MM-DD.csv
+|       +-- resumenes/
+|           +-- resumen_YYYY-MM-DD_auto.xlsx
 +-- assets/
     +-- cafe_chico.jpg
     +-- medialunas.jpg
@@ -74,7 +79,8 @@ pyinstaller --onefile --noconsole --add-data "data;data" --add-data "assets;asse
 4. Control de mes automatico (archivos por mes se crean solos) (**implementado**).
 5. Backup automatico diario del CSV actual (**implementado**).
 6. Mensaje de exito/error siempre visible (feedback visual al cajero) (**implementado**).
-7. Proteccion ante cierre accidental (flush+fsync ya implementado).
+7. Resumen automatico al cierre del dia + boton manual (**implementado**).
+8. Proteccion ante cierre accidental (flush+fsync ya implementado).
 
 ---
 
@@ -91,6 +97,7 @@ pyinstaller --onefile --noconsole --add-data "data;data" --add-data "assets;asse
 | No hay rollback si se interrumpe entre filas | Se guardan parciales | Confirmacion previa reduce el riesgo, pero no hay rollback |
 | Excel abierto mientras se intenta exportar | Falla de permiso | Capturado con error |
 | Backups automaticos diarios | Se generan en `data/historial/backups` al primer uso del dia | Revisar el espacio disponible y copiar fuera de la PC |
+| Resumenes automaticos | Se crean/actualizan en `data/historial/resumenes` (archivos .xlsx) | Consultar estos archivos para el arqueo diario |
 | Ticket ID se basa en archivo mensual | Reinicia cada mes | Comportamiento esperado, documentado |
 
 ---

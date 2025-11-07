@@ -24,3 +24,4 @@ data/historial/
 # Logs
 *.log
 *.logs
+logs.txt
