@@ -1,41 +1,42 @@
-# Cafetería POS
+# Cafeteria POS
 
-Sistema de gestión de pedidos para cafeterías pequeñas.  
-Aplicación de escritorio desarrollada en **Python + PySide6**, con persistencia en archivos CSV mensuales y exportación a Excel.
+Sistema de gestion de pedidos para cafeterias pequenas.
+Aplicacion de escritorio desarrollada en **Python + PySide6**, con persistencia en archivos CSV mensuales y exportacion a Excel.
 
 ---
 
-## 🚀 Características actuales
+## Caracteristicas actuales
 
-- Interfaz gráfica moderna y simple.
-- Menú de categorías (vertical) con grilla de productos con imágenes.
-- Ticket con cálculo automático de totales.
-- Persistencia de ventas en archivo CSV mensual.
-- Exportación a Excel (.xlsx) con hoja de resumen por categoría.
-- Selección de medio de pago.
+- Interfaz grafica moderna y simple.
+- Menu lateral de categorias con grilla de productos con imagenes.
+- Ticket con calculo automatico de totales y seleccion de medio de pago.
+- Confirmacion de cobro antes de guardar cada venta.
+- Validacion de productos y precios (sin nombres vacios ni valores menores o iguales a 0).
+- Persistencia de ventas en archivos CSV mensuales.
+- Exportacion a Excel (.xlsx) con hoja de resumen por categoria.
+- Registro de errores en `logs.txt` (con traceback) para soporte rapido.
 - IDs de ticket continuos entre sesiones.
 - Ejecutable portable (PyInstaller).
 
 ---
 
-## 🧩 Estructura del proyecto
+## Estructura del proyecto
 
 ```
 app/
-│
-├── main.py
-├── data/
-│   ├── productos.csv
-│   └── historial/
-│       └── ventas_YYYY-MM.csv
-└── assets/
-    ├── cafe_chico.jpg
-    └── medialunas.jpg
++-- main.py
++-- data/
+|   +-- productos.csv
+|   +-- historial/
+|       +-- ventas_YYYY-MM.csv
++-- assets/
+    +-- cafe_chico.jpg
+    +-- medialunas.jpg
 ```
 
 ---
 
-## 🛠️ Instalación y ejecución
+## Instalacion y ejecucion
 
 1. Instalar dependencias:
 
@@ -56,54 +57,42 @@ pip install pyinstaller
 pyinstaller --onefile --noconsole --add-data "data;data" --add-data "assets;assets" main.py
 ```
 
----
-
-## 🧠 Posibles features futuras
-
-- ✅ Reportes avanzados (por día, medio de pago, cajero, etc.).  
-- ✅ Impresión de tickets (PDF o impresora térmica).  
-- ✅ Control de stock básico.  
-- ✅ Soporte multiusuario / roles (admin, cajero).  
-- ✅ Resumen automático al cierre de día.  
-- ✅ Importar/exportar datos históricos (para backups).  
-- ✅ Modo “borrador” de ticket (autosave y recuperación tras cierre inesperado).  
-- ✅ Atajos de teclado y lector de código de barras.  
-- ✅ Interfaz touch optimizada.  
-- ✅ Modo “Kiosco” pantalla completa.
+4. Logs de errores: se generan automaticamente en `logs.txt` junto al `main.py`. El archivo queda creado desde el arranque para que el staff lo pueda compartir ante incidentes.
 
 ---
 
-## 🟢 Features recomendadas para salida a producción (MVP)
+## Features recomendadas para salida a produccion (MVP)
 
-1. **Confirmación de cobro** antes de registrar la venta.  
-2. **Logs de errores** (archivo `logs.txt` con traceback).  
-3. **Validación de precios y productos** antes de guardar (no vacíos, no 0).  
-4. **Control de mes** automático (archivos por mes se crean solos).  
-5. **Backup automático diario** del CSV actual.  
-6. **Mensaje de éxito/error** siempre visible (feedback visual al cajero).  
-7. **Protección ante cierre accidental** (flush+fsync ya implementado).
+1. Confirmacion de cobro antes de registrar la venta (**implementado**).
+2. Logs de errores en `logs.txt` (**implementado**).
+3. Validacion de precios y productos al leer/guardar (**implementado**).
+4. Control de mes automatico (archivos por mes se crean solos).
+5. Backup automatico diario del CSV actual.
+6. Mensaje de exito/error siempre visible (feedback visual al cajero).
+7. Proteccion ante cierre accidental (flush+fsync ya implementado).
 
 ---
 
-## ⚠️ Posibles fallos actuales y limitaciones
+## Posibles fallos actuales y limitaciones
 
-| Situación | Comportamiento actual | Riesgo / mejora posible |
-|------------|----------------------|--------------------------|
-| Corte de energía durante escritura | Puede truncar última línea si no terminó el fsync | Mitigado con flush/fsync, pero no 100 % garantizado |
-| CSV manualmente editado | Si se cambian encabezados o tipos, el export a Excel puede fallar | Validar CSV antes de leer |
-| Productos sin imagen | Muestra botón vacío | OK visual, pero confunde |
-| Múltiples usuarios abriendo la app al mismo tiempo | Pueden pisarse al escribir CSV | No soportado aún |
+| Situacion | Comportamiento actual | Riesgo / mejora posible |
+|-----------|----------------------|-------------------------|
+| Corte de energia durante escritura | Puede truncar ultima linea si no termino el fsync | Mitigado con flush/fsync, pero no garantiza 100% |
+| CSV manualmente editado | Si se cambian encabezados o tipos, el export a Excel puede fallar | Validar CSV antes de leer (en proceso) |
+| Productos sin imagen | Muestra boton vacio | OK visual, pero confunde |
+| Multiples usuarios abriendo la app al mismo tiempo | Pueden pisarse al escribir CSV | No soportado aun |
 | Rutas con caracteres raros | Puede fallar en Windows | Normalizar paths |
-| Ticket vacío y se presiona Cobrar | Mensaje, pero no bloquea ticket_id | Menor |
-| No hay rollback si se interrumpe entre filas | Se guardan parciales | Añadir confirmación por ticket |
+| Ticket vacio y se presiona Cobrar | Mensaje, pero no bloquea ticket_id | Menor |
+| No hay rollback si se interrumpe entre filas | Se guardan parciales | Agregar confirmacion por ticket (en curso) |
 | Excel abierto mientras se intenta exportar | Falla de permiso | Capturado con error |
-| Faltan backups automáticos | Depende del usuario hacerlos | Agregar backup diario |
-| Ticket ID se basa en archivo mensual | Reinicia cada mes | Correcto, pero documentar comportamiento |
+| Faltan backups automaticos | Depende del usuario hacerlos | Agregar backup diario |
+| Ticket ID se basa en archivo mensual | Reinicia cada mes | Comportamiento esperado, documentado |
 
 ---
 
-## 📋 Licencia y créditos
+## Licencia y creditos
 
-Desarrollado como prototipo para gestión de caja en cafetería local.  
-Autor: *[Diego Méndez]*  
-Versión: **MVP 0.9**
+Desarrollado como prototipo para gestion de caja en cafeterias locales.
+Autor: *[Diego Mendez]*
+Version: **MVP 0.9**
+

@@ -1,5 +1,5 @@
 # main.py
-import sys, os, csv, datetime
+import sys, os, csv, datetime, traceback
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -15,6 +15,33 @@ BASE_DIR   = Path(__file__).parent
 DATA_DIR   = BASE_DIR / "data"
 ASSETS_DIR = BASE_DIR / "assets"
 PRODS_CSV  = DATA_DIR / "productos.csv"
+LOG_FILE   = BASE_DIR / "logs.txt"
+
+
+def ensure_log_file():
+    """Crea logs.txt vacío si aún no existe (para que el staff lo ubique)."""
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if not LOG_FILE.exists():
+            with open(LOG_FILE, "w", encoding="utf-8") as log:
+                log.write("=== Cafeteria POS logs ===\n")
+    except Exception:
+        pass
+
+
+def log_error(message: str, exc: Exception | None = None):
+    """Persist simple timestamped logs for soporte."""
+    try:
+        ensure_log_file()
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(LOG_FILE, "a", encoding="utf-8") as log:
+            log.write(f"[{timestamp}] {message}\n")
+            if exc:
+                log.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+            log.write("\n")
+    except Exception:
+        # No hacemos nada si fallan los logs para no romper el flujo principal.
+        pass
 
 # --- Utilidades de datos ---
 def ensure_dirs():
@@ -33,18 +60,36 @@ def bootstrap_products_csv():
             csv.writer(f).writerows(rows)
 
 def load_products():
-    """Lee productos.csv -> lista de dicts."""
+    """Lee productos.csv -> (lista de dicts válidos, lista de mensajes de error)."""
     prods = []
+    errors = []
     with open(PRODS_CSV, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
-        for row in reader:
+        for idx, row in enumerate(reader, start=2):
             if row.get("activo", "1") == "1":
+                desc = row.get("item_desc", "").strip()
+                if not desc:
+                    errors.append(f"Linea {idx}: item_desc vacío (ID {row.get('item_id','?')}).")
+                    continue
                 try:
                     row["precio"] = float(row["precio"])
                 except Exception:
-                    row["precio"] = 0.0
+                    errors.append(f"Linea {idx}: precio inválido ({row.get('precio')}) en {desc}.")
+                    continue
+                if row["precio"] <= 0:
+                    errors.append(f"Linea {idx}: precio debe ser > 0 en {desc}.")
+                    continue
                 prods.append(row)
-    return prods
+    return prods, errors
+
+
+def install_exception_logger():
+    """Registra un excepthook global para dejar trazas en logs.txt."""
+    ensure_log_file()
+    def _hook(exc_type, exc, tb):
+        log_error("Excepcion no controlada", exc)
+        sys.__excepthook__(exc_type, exc, tb)
+    sys.excepthook = _hook
 
 def current_sales_path():
     """Devuelve ruta del CSV mensual y se asegura de que exista con encabezado."""
@@ -108,7 +153,7 @@ class POS(QWidget):
         ensure_dirs()
         bootstrap_products_csv()
 
-        self.prods = load_products()
+        self.prods, self.prods_errors = load_products()
         self.ticket = []  # lista de {"prod":dict, "cant":int}
         sales_csv = current_sales_path()
         self.ticket_id = last_ticket_id_from_csv(sales_csv)
@@ -153,7 +198,7 @@ class POS(QWidget):
         """)
 
         self.mpago = QComboBox()
-        self.mpago.addItems(["Efectivo", "Tarjeta", "QR", "Débito"])
+        self.mpago.addItems(["Efectivo", "Tarjeta", "QR", "Debito"])
 
         self.total_lbl = QLabel("Total: $0.00")
         self.total_lbl.setAlignment(Qt.AlignRight)
@@ -202,6 +247,8 @@ class POS(QWidget):
         self.cat_list.currentTextChanged.connect(self.apply_filters)
         self.cat_list.setCurrentRow(0)
         self.render_products(self.prods)
+        if self.prods_errors:
+            self.show_validation_errors(self.prods_errors)
 
     # ---- Render y filtros ----
     def apply_filters(self):
@@ -241,8 +288,39 @@ class POS(QWidget):
             p, c = it["prod"], it["cant"]
             st = p["precio"] * c
             total += st
-            self.ticket_list.addItem(f"{c} x {p['item_desc']}  —  ${st:,.2f}")
+            self.ticket_list.addItem(f"{c} x {p['item_desc']}  ->  ${st:,.2f}")
         self.total_lbl.setText(f"Total: ${total:,.2f}")
+
+    def show_validation_errors(self, errors):
+        preview = "\n".join(errors[:5])
+        if len(errors) > 5:
+            preview += f"\n... ({len(errors) - 5} filas mas)"
+        log_error("Productos invalidos detectados al cargar CSV:\n" + preview)
+        QMessageBox.warning(
+            self,
+            "Productos invalidos",
+            "Se omitieron productos por datos incompletos:\n\n" + preview
+        )
+
+    def ticket_total(self):
+        return sum(it["prod"]["precio"] * it["cant"] for it in self.ticket)
+
+    def confirm_checkout(self, total, medio):
+        lines = [f"{it['cant']} x {it['prod']['item_desc']}" for it in self.ticket]
+        if len(lines) > 5:
+            extra = len(lines) - 5
+            lines = lines[:5] + [f"... ({extra} items mas)"]
+        details = "\n".join(lines)
+
+        confirm = QMessageBox(self)
+        confirm.setWindowTitle("Confirmar cobro")
+        confirm.setIcon(QMessageBox.Question)
+        confirm.setText(f"Ticket #{self.ticket_id:06d}\nTotal: ${total:,.2f}\nMedio: {medio}")
+        if details:
+            confirm.setInformativeText(details)
+        confirm.setStandardButtons(QMessageBox.Cancel | QMessageBox.Ok)
+        confirm.setDefaultButton(QMessageBox.Ok)
+        return confirm.exec() == QMessageBox.Ok
 
     # ---- Acciones ----
     def checkout(self):
@@ -250,9 +328,24 @@ class POS(QWidget):
             QMessageBox.information(self, "Cobrar", "No hay productos en el ticket.")
             return
 
+        inval = [it for it in self.ticket if not it["prod"]["item_desc"].strip() or it["prod"]["precio"] <= 0]
+        if inval:
+            names = ", ".join(it["prod"].get("item_desc", "N/D") or "N/D" for it in inval)
+            log_error(f"Intento de cobro con productos invalidos: {names}")
+            QMessageBox.critical(
+                self,
+                "Datos invalidos",
+                "Hay productos sin descripcion o con precio 0.\nRevisar el CSV antes de continuar."
+            )
+            return
+
         path = current_sales_path()
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         medio = self.mpago.currentText() if hasattr(self, "mpago") else "Efectivo"
+        total = self.ticket_total()
+
+        if not self.confirm_checkout(total, medio):
+            return
 
         try:
             with open(path, "a", encoding="utf-8", newline="") as f:
@@ -270,6 +363,7 @@ class POS(QWidget):
             self.refresh_ticket()
             QMessageBox.information(self, "Cobrar", "Venta registrada y guardada.")
         except Exception as e:
+            log_error("Error al guardar ticket.", e)
             QMessageBox.critical(self, "Cobrar", f"Error al guardar:\n{e}")
 
     def export_excel(self):
@@ -300,12 +394,18 @@ class POS(QWidget):
                     pass
             QMessageBox.information(self, "Exportar", f"Exportado a:\n{dest_path}")
         except Exception as e:
+            log_error("Error exportando a Excel.", e)
             QMessageBox.critical(self, "Exportar", f"Error exportando:\n{e}")
 
 # --- Entry point ---
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    w = POS()
-    w.resize(1200, 720)
-    w.show()
-    sys.exit(app.exec())
+    install_exception_logger()
+    try:
+        app = QApplication(sys.argv)
+        w = POS()
+        w.resize(1200, 720)
+        w.show()
+        sys.exit(app.exec())
+    except Exception as exc:
+        log_error("Fallo fatal al iniciar la aplicacion.", exc)
+        raise
