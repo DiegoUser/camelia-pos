@@ -1,0 +1,141 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 2162 >>
+stream
+BT
+/F1 12 Tf
+14 TL
+72 770 Td
+(Cafeteria POS - Manual de Usuario) Tj
+T*
+(Version MVP 1.0) Tj
+T*
+(Actualizado: 2025-11-06) Tj
+T*
+(--------------------------------------------------) Tj
+T*
+(1. Contenido del paquete) Tj
+T*
+( - Carpeta "Cafeteria POS" con main.exe, data/, assets/ y logs.txt \(se crea solo\).) Tj
+T*
+( - No se requiere instalar Python ni dependencias adicionales.) Tj
+T*
+() Tj
+T*
+(2. Instalacion) Tj
+T*
+( 1. Copiar la carpeta completa a la PC de caja \(por ejemplo C:/Apps/CafeteriaPOS\).) Tj
+T*
+( 2. Verificar que la carpeta tenga permisos de lectura y escritura.) Tj
+T*
+( 3. Crear un acceso directo a main.exe en el escritorio si se desea.) Tj
+T*
+() Tj
+T*
+(3. Puesta en marcha diaria) Tj
+T*
+( 1. Hacer doble click en main.exe.) Tj
+T*
+( 2. Esperar a que aparezca la ventana principal con la grilla de productos y el ticket vacio.) Tj
+T*
+( 3. La aplicacion crea automaticamente backups y resguardos al iniciar.) Tj
+T*
+() Tj
+T*
+(4. Cargar productos) Tj
+T*
+( - Click sobre las tarjetas de producto para sumarlos al ticket.) Tj
+T*
+( - Usar la caja 'Codigo rapido': escribir ITEM_ID o ITEM_ID*3 y presionar Enter.) Tj
+T*
+( - El panel derecho muestra cantidad y total del ticket en tiempo real.) Tj
+T*
+() Tj
+T*
+(5. Cobro) Tj
+T*
+( - Revisar el ticket, elegir medio de pago y presionar 'Cobrar' \(o Ctrl+Enter/Ctrl+Return\).) Tj
+T*
+( - Confirmar en el dialogo: si se acepta se guarda la venta y se limpia el ticket.) Tj
+T*
+() Tj
+T*
+(6. Exportaciones y resumen diario) Tj
+T*
+( - Boton 'Exportar a Excel' o Ctrl+E: crea ventas_YYYY-MM.xlsx con resumen por categoria.) Tj
+T*
+( - Boton 'Resumen diario' o Ctrl+R: genera/actualiza resumen_YYYY-MM-DD_manual.xlsx.) Tj
+T*
+( - Al comenzar un nuevo dia se crea resumen_YYYY-MM-DD_auto.xlsx sin accion del usuario.) Tj
+T*
+() Tj
+T*
+(7. Backups) Tj
+T*
+( - La app guarda una copia del CSV del mes en data/historial/backups/ cada vez que se registran ventas.) Tj
+T*
+( - Sugerencia: al final del dia copiar los archivos de backups y resumenes a un pendrive o nube.) Tj
+T*
+() Tj
+T*
+(8. Atajos) Tj
+T*
+( - Ctrl+Enter o Ctrl+Return: Cobrar.) Tj
+T*
+( - Ctrl+E: Exportar a Excel.) Tj
+T*
+( - Ctrl+R: Resumen diario manual.) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Length 373 >>
+stream
+BT
+/F1 12 Tf
+14 TL
+72 770 Td
+( - Ctrl+L: Enfocar la caja de Codigo rapido.) Tj
+T*
+() Tj
+T*
+(9. Solucion de problemas) Tj
+T*
+( - Si aparece un error, revisar logs.txt y enviar al soporte designado.) Tj
+T*
+( - Si Excel esta abierto, cerrarlo antes de exportar o generar resumen diario.) Tj
+T*
+( - Asegurarse de tener permisos de escritura sobre la carpeta del sistema.) Tj
+ET
+endstream
+endobj
+4 0 obj
+<< /Type /Pages /Kids [ 5 0 R 6 0 R ] /Count 2 >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Contents 2 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+6 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Contents 3 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+7 0 obj
+<< /Type /Catalog /Pages 4 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000002293 00000 n 
+0000002717 00000 n 
+0000002782 00000 n 
+0000002908 00000 n 
+0000003034 00000 n 
+trailer
+<< /Size 8 /Root 7 0 R >>
+startxref
+3083
+%%EOF
