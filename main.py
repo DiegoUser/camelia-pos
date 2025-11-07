@@ -1,5 +1,5 @@
 # main.py
-import sys, os, csv, datetime, traceback
+import sys, os, csv, datetime, traceback, shutil
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -16,6 +16,7 @@ DATA_DIR   = BASE_DIR / "data"
 ASSETS_DIR = BASE_DIR / "assets"
 PRODS_CSV  = DATA_DIR / "productos.csv"
 LOG_FILE   = BASE_DIR / "logs.txt"
+BACKUP_DIR = DATA_DIR / "historial" / "backups"
 
 
 def ensure_log_file():
@@ -45,9 +46,11 @@ def log_error(message: str, exc: Exception | None = None):
 
 # --- Utilidades de datos ---
 def ensure_dirs():
-    (DATA_DIR / "historial").mkdir(parents=True, exist_ok=True)
+    hist_dir = DATA_DIR / "historial"
+    hist_dir.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 def bootstrap_products_csv():
     """Crea un productos.csv de ejemplo si no existe."""
@@ -155,8 +158,15 @@ class POS(QWidget):
 
         self.prods, self.prods_errors = load_products()
         self.ticket = []  # lista de {"prod":dict, "cant":int}
-        sales_csv = current_sales_path()
-        self.ticket_id = last_ticket_id_from_csv(sales_csv)
+        self.status_lbl = QLabel("")
+        self.status_lbl.setWordWrap(True)
+        self.status_lbl.setStyleSheet(
+            "padding:8px; border-radius:8px; background:#252525; color:#d0d0d0;"
+        )
+        self.sales_path = None
+        self.current_period = None
+        self.last_backup_signature = None
+        self.refresh_sales_target(force=True)
 
         # ----- Buscador (definido ANTES de señales) -----
         self.search = QLineEdit()
@@ -224,6 +234,7 @@ class POS(QWidget):
         right.addWidget(QLabel("Ticket actual"))
         right.addWidget(self.ticket_list, 1)
         right.addWidget(self.total_lbl)
+        right.addWidget(self.status_lbl)
         right.addWidget(QLabel("Medio de pago"))
         right.addWidget(self.mpago)
         right.addWidget(btn_export)
@@ -247,6 +258,8 @@ class POS(QWidget):
         self.cat_list.currentTextChanged.connect(self.apply_filters)
         self.cat_list.setCurrentRow(0)
         self.render_products(self.prods)
+        self.refresh_ticket()
+        self.ensure_daily_backup()
         if self.prods_errors:
             self.show_validation_errors(self.prods_errors)
 
@@ -281,7 +294,7 @@ class POS(QWidget):
         self.ticket.append({"prod": prod, "cant": cant})
         self.refresh_ticket()
 
-    def refresh_ticket(self):
+    def refresh_ticket(self, keep_status=False):
         self.ticket_list.clear()
         total = 0.0
         for it in self.ticket:
@@ -290,6 +303,29 @@ class POS(QWidget):
             total += st
             self.ticket_list.addItem(f"{c} x {p['item_desc']}  ->  ${st:,.2f}")
         self.total_lbl.setText(f"Total: ${total:,.2f}")
+        if not keep_status:
+            self.update_ticket_status(total)
+
+    def update_ticket_status(self, total):
+        if not self.ticket:
+            self.set_status("Ticket vacio. Agrega productos para cobrar.", "info")
+            return
+        items = sum(it["cant"] for it in self.ticket)
+        self.set_status(f"Ticket con {items} items. Total ${total:,.2f}", "info")
+
+    def set_status(self, message, level="info"):
+        colors = {
+            "info": "#9fc5ff",
+            "success": "#7feaae",
+            "warning": "#ffd479",
+            "error": "#ff8b8b",
+        }
+        color = colors.get(level, colors["info"])
+        self.status_lbl.setText(message)
+        self.status_lbl.setStyleSheet(
+            "padding:8px; border-radius:8px; background:#252525; "
+            f"color:{color}; font-weight:600;"
+        )
 
     def show_validation_errors(self, errors):
         preview = "\n".join(errors[:5])
@@ -301,9 +337,42 @@ class POS(QWidget):
             "Productos invalidos",
             "Se omitieron productos por datos incompletos:\n\n" + preview
         )
+        self.set_status("Productos invalidos fueron omitidos del menu.", "warning")
 
     def ticket_total(self):
         return sum(it["prod"]["precio"] * it["cant"] for it in self.ticket)
+
+    def refresh_sales_target(self, force=False):
+        period = datetime.datetime.now().strftime("%Y-%m")
+        if force or self.sales_path is None or period != self.current_period:
+            self.sales_path = current_sales_path()
+            self.current_period = period
+            self.ticket_id = last_ticket_id_from_csv(self.sales_path)
+            if not force:
+                self.set_status(
+                    f"Nuevo periodo detectado ({period}). Ticket #{self.ticket_id:06d}",
+                    "info",
+                )
+
+    def ensure_daily_backup(self, notify=True):
+        if not self.sales_path or not self.sales_path.exists():
+            return
+        today = datetime.date.today().strftime("%Y-%m-%d")
+        stats = self.sales_path.stat()
+        signature = f"{self.sales_path.name}-{today}-{stats.st_mtime_ns}"
+        if self.last_backup_signature == signature:
+            return
+        backup_file = BACKUP_DIR / f"{self.sales_path.stem}_{today}.csv"
+        existed = backup_file.exists()
+        try:
+            shutil.copy2(self.sales_path, backup_file)
+            self.last_backup_signature = signature
+            if notify:
+                action = "actualizado" if existed else "creado"
+                self.set_status(f"Backup diario {action} ({backup_file.name}).", "info")
+        except Exception as exc:
+            log_error("Error creando backup diario.", exc)
+            self.set_status("No se pudo crear el backup diario.", "warning")
 
     def confirm_checkout(self, total, medio):
         lines = [f"{it['cant']} x {it['prod']['item_desc']}" for it in self.ticket]
@@ -326,7 +395,10 @@ class POS(QWidget):
     def checkout(self):
         if not self.ticket:
             QMessageBox.information(self, "Cobrar", "No hay productos en el ticket.")
+            self.set_status("No hay productos en el ticket.", "warning")
             return
+
+        self.refresh_sales_target()
 
         inval = [it for it in self.ticket if not it["prod"]["item_desc"].strip() or it["prod"]["precio"] <= 0]
         if inval:
@@ -337,9 +409,10 @@ class POS(QWidget):
                 "Datos invalidos",
                 "Hay productos sin descripcion o con precio 0.\nRevisar el CSV antes de continuar."
             )
+            self.set_status("Hay productos invalidos en el ticket. Revisar CSV.", "error")
             return
 
-        path = current_sales_path()
+        path = self.sales_path or current_sales_path()
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         medio = self.mpago.currentText() if hasattr(self, "mpago") else "Efectivo"
         total = self.ticket_total()
@@ -348,34 +421,41 @@ class POS(QWidget):
             return
 
         try:
+            ticket_label = f"{self.ticket_id:06d}"
             with open(path, "a", encoding="utf-8", newline="") as f:
                 w = csv.writer(f)
                 for it in self.ticket:
                     p, c = it["prod"], it["cant"]
                     st = p["precio"] * c
-                    w.writerow([now, f"{self.ticket_id:06d}", p["item_id"], p["item_desc"],
+                    w.writerow([now, ticket_label, p["item_id"], p["item_desc"],
                                 p["categoria"], c, p["precio"], st, medio, "Cajero", ""])
                 f.flush()
                 os.fsync(f.fileno())
 
             self.ticket_id += 1
             self.ticket = []
-            self.refresh_ticket()
+            self.refresh_ticket(keep_status=True)
             QMessageBox.information(self, "Cobrar", "Venta registrada y guardada.")
+            self.set_status(f"Venta #{ticket_label} registrada correctamente.", "success")
+            self.ensure_daily_backup(notify=False)
         except Exception as e:
             log_error("Error al guardar ticket.", e)
+            self.set_status("Error al guardar la venta. Revisar logs.", "error")
             QMessageBox.critical(self, "Cobrar", f"Error al guardar:\n{e}")
 
     def export_excel(self):
         try:
             import pandas as pd
         except Exception:
-            QMessageBox.warning(self, "Exportar", "Necesitás instalar pandas y openpyxl.\n\npip install pandas openpyxl")
+            QMessageBox.warning(self, "Exportar", "Necesitas instalar pandas y openpyxl.\n\npip install pandas openpyxl")
+            self.set_status("Instala pandas y openpyxl para exportar a Excel.", "warning")
             return
 
-        src = current_sales_path()
+        self.refresh_sales_target()
+        src = self.sales_path or current_sales_path()
         if not src.exists():
             QMessageBox.information(self, "Exportar", "No hay ventas del mes para exportar.")
+            self.set_status("No hay ventas del mes para exportar.", "info")
             return
 
         suggested = src.with_suffix(".xlsx")
@@ -389,12 +469,14 @@ class POS(QWidget):
                 df.to_excel(writer, index=False, sheet_name="Ventas")
                 try:
                     resumen = df.groupby("categoria")[["subtotal"]].sum().reset_index()
-                    resumen.to_excel(writer, index=False, sheet_name="Resumen por categoría")
+                    resumen.to_excel(writer, index=False, sheet_name="Resumen por categoria")
                 except Exception:
                     pass
             QMessageBox.information(self, "Exportar", f"Exportado a:\n{dest_path}")
+            self.set_status(f"Ventas exportadas a {dest_path}.", "success")
         except Exception as e:
             log_error("Error exportando a Excel.", e)
+            self.set_status("Error exportando a Excel. Revisar logs.", "error")
             QMessageBox.critical(self, "Exportar", f"Error exportando:\n{e}")
 
 # --- Entry point ---

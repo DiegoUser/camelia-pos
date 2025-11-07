@@ -12,9 +12,12 @@ Aplicacion de escritorio desarrollada en **Python + PySide6**, con persistencia 
 - Ticket con calculo automatico de totales y seleccion de medio de pago.
 - Confirmacion de cobro antes de guardar cada venta.
 - Validacion de productos y precios (sin nombres vacios ni valores menores o iguales a 0).
+- Control automatico del CSV mensual (detecta cambio de mes y reinicia IDs).
 - Persistencia de ventas en archivos CSV mensuales.
+- Backup diario del CSV activo en `data/historial/backups`.
 - Exportacion a Excel (.xlsx) con hoja de resumen por categoria.
 - Registro de errores en `logs.txt` (con traceback) para soporte rapido.
+- Indicador de estado permanente (exito/error) visible para el cajero.
 - IDs de ticket continuos entre sesiones.
 - Ejecutable portable (PyInstaller).
 
@@ -29,6 +32,8 @@ app/
 |   +-- productos.csv
 |   +-- historial/
 |       +-- ventas_YYYY-MM.csv
+|       +-- backups/
+|           +-- ventas_YYYY-MM-DD.csv
 +-- assets/
     +-- cafe_chico.jpg
     +-- medialunas.jpg
@@ -66,9 +71,9 @@ pyinstaller --onefile --noconsole --add-data "data;data" --add-data "assets;asse
 1. Confirmacion de cobro antes de registrar la venta (**implementado**).
 2. Logs de errores en `logs.txt` (**implementado**).
 3. Validacion de precios y productos al leer/guardar (**implementado**).
-4. Control de mes automatico (archivos por mes se crean solos).
-5. Backup automatico diario del CSV actual.
-6. Mensaje de exito/error siempre visible (feedback visual al cajero).
+4. Control de mes automatico (archivos por mes se crean solos) (**implementado**).
+5. Backup automatico diario del CSV actual (**implementado**).
+6. Mensaje de exito/error siempre visible (feedback visual al cajero) (**implementado**).
 7. Proteccion ante cierre accidental (flush+fsync ya implementado).
 
 ---
@@ -83,9 +88,9 @@ pyinstaller --onefile --noconsole --add-data "data;data" --add-data "assets;asse
 | Multiples usuarios abriendo la app al mismo tiempo | Pueden pisarse al escribir CSV | No soportado aun |
 | Rutas con caracteres raros | Puede fallar en Windows | Normalizar paths |
 | Ticket vacio y se presiona Cobrar | Mensaje, pero no bloquea ticket_id | Menor |
-| No hay rollback si se interrumpe entre filas | Se guardan parciales | Agregar confirmacion por ticket (en curso) |
+| No hay rollback si se interrumpe entre filas | Se guardan parciales | Confirmacion previa reduce el riesgo, pero no hay rollback |
 | Excel abierto mientras se intenta exportar | Falla de permiso | Capturado con error |
-| Faltan backups automaticos | Depende del usuario hacerlos | Agregar backup diario |
+| Backups automaticos diarios | Se generan en `data/historial/backups` al primer uso del dia | Revisar el espacio disponible y copiar fuera de la PC |
 | Ticket ID se basa en archivo mensual | Reinicia cada mes | Comportamiento esperado, documentado |
 
 ---
