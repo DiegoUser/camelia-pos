@@ -29,6 +29,68 @@ PRODS_CSV  = DATA_DIR / "productos.csv"
 LOG_FILE   = APP_DIR / "logs.txt"
 BACKUP_DIR = DATA_DIR / "historial" / "backups"
 SUMMARY_DIR = DATA_DIR / "historial" / "resumenes"
+PRINTER_NAME = os.environ.get("POS_PRINTER")
+
+
+def sanitize_pdf_text(text: str) -> str:
+    return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
+
+
+def write_text_pdf(path: Path, lines, title="Ticket Avocado"):
+    lines = [line.encode("ascii", "ignore").decode("ascii") for line in lines]
+    chunks = [lines[i:i + 40] for i in range(0, len(lines), 40)] or [[""]]
+    objects = []
+
+    def add_object(data: bytes) -> int:
+        objects.append(data)
+        return len(objects)
+
+    def set_object(idx: int, data: bytes):
+        objects[idx - 1] = data
+
+    font_id = add_object(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    content_ids = []
+    for chunk in chunks:
+        content_lines = ["BT", "/F1 11 Tf", "13 TL", "40 780 Td"]
+        for idx, line in enumerate(chunk):
+            content_lines.append(f"({sanitize_pdf_text(line)}) Tj")
+            if idx != len(chunk) - 1:
+                content_lines.append("T*")
+        content_lines.append("ET")
+        content_str = "\n".join(content_lines).encode("ascii")
+        stream = f"<< /Length {len(content_str)} >>\nstream\n".encode("ascii") + content_str + b"\nendstream"
+        content_ids.append(add_object(stream))
+
+    pages_obj_id = len(objects) + 1
+    objects.append(None)
+    page_ids = []
+    for content_id in content_ids:
+        page_dict = (
+            f"<< /Type /Page /Parent {pages_obj_id} 0 R /MediaBox [0 0 612 792] "
+            f"/Contents {content_id} 0 R /Resources << /Font << /F1 {font_id} 0 R >> >> >>"
+        ).encode("ascii")
+        page_ids.append(add_object(page_dict))
+    kids = " ".join(f"{pid} 0 R" for pid in page_ids)
+    pages_dict = f"<< /Type /Pages /Kids [ {kids} ] /Count {len(page_ids)} >>".encode("ascii")
+    set_object(pages_obj_id, pages_dict)
+    catalog_id = add_object(f"<< /Type /Catalog /Pages {pages_obj_id} 0 R /Lang (es) /ViewerPreferences << /DisplayDocTitle true >> >>".encode("ascii"))
+
+    with path.open("wb") as f:
+        f.write(b"%PDF-1.4\n")
+        offsets = [0]
+        for idx, data in enumerate(objects, start=1):
+            offsets.append(f.tell())
+            f.write(f"{idx} 0 obj\n".encode("ascii"))
+            f.write(data)
+            f.write(b"\nendobj\n")
+        xref_pos = f.tell()
+        total = len(objects) + 1
+        f.write(f"xref\n0 {total}\n".encode("ascii"))
+        f.write(b"0000000000 65535 f \n")
+        for offset in offsets[1:]:
+            f.write(f"{offset:010d} 00000 n \n".encode("ascii"))
+        metadata = f"trailer\n<< /Size {total} /Root {catalog_id} 0 R /Info << /Title ({sanitize_pdf_text(title)}) >> >>\nstartxref\n{xref_pos}\n%%EOF".encode("ascii")
+        f.write(metadata)
 
 
 def ensure_log_file():
@@ -605,6 +667,69 @@ class POS(QWidget):
         )
         return True, str(xlsx_path)
 
+    def print_ticket(self, ticket_label: str, items_snapshot, total, medio):
+        try:
+            import win32print
+        except Exception:
+            log_error(f"Impresion no disponible para ticket #{ticket_label}: falta pywin32.")
+            return False
+
+        try:
+            printer = PRINTER_NAME or win32print.GetDefaultPrinter()
+        except Exception as exc:
+            log_error(f"No se pudo resolver la impresora predeterminada para ticket #{ticket_label}.", exc)
+            return False
+
+        def format_line(desc, qty, price):
+            subtotal = qty * price
+            return f"{qty:>2} x {desc:.26} ${subtotal:>7.2f}"
+
+        lines = [
+            "Cafeteria POS",
+            f"Ticket #{ticket_label}",
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            f"Pago: {medio}",
+            "-" * 32,
+        ]
+        for item in items_snapshot:
+            lines.append(format_line(item["desc"], item["cant"], item["precio"]))
+        lines.extend(
+            [
+                "-" * 32,
+                f"TOTAL: ${total:,.2f}",
+                "",
+                "Gracias por su compra!",
+            ]
+        )
+        content = "\r\n".join(lines) + "\r\n\r\n"
+
+        if printer and "pdf" in printer.lower():
+            pdf_path = Path.home() / "Documents" / f"Ticket_{ticket_label}.pdf"
+            try:
+                write_text_pdf(pdf_path, lines, title=f"Ticket {ticket_label}")
+                self.set_status(f"Ticket guardado en {pdf_path}.", "info")
+                return True
+            except Exception as exc:
+                log_error(f"No se pudo generar PDF para ticket #{ticket_label}.", exc)
+                return False
+
+        try:
+            handle = win32print.OpenPrinter(printer)
+            job = win32print.StartDocPrinter(handle, 1, ("Ticket Avocado", None, "RAW"))
+            win32print.StartPagePrinter(handle)
+            win32print.WritePrinter(handle, content.encode("utf-8"))
+            win32print.EndPagePrinter(handle)
+            win32print.EndDocPrinter(handle)
+            win32print.ClosePrinter(handle)
+            return True
+        except Exception as exc:
+            log_error(f"Error al imprimir ticket #{ticket_label} en {printer}.", exc)
+            try:
+                win32print.ClosePrinter(handle)
+            except Exception:
+                pass
+            return False
+
     def confirm_checkout(self, total, medio):
         lines = [f"{it['cant']} x {it['prod']['item_desc']}" for it in self.ticket]
         if len(lines) > 5:
@@ -651,6 +776,15 @@ class POS(QWidget):
         if not self.confirm_checkout(total, medio):
             return
 
+        ticket_snapshot = [
+            {
+                "desc": it["prod"]["item_desc"],
+                "cant": it["cant"],
+                "precio": it["prod"]["precio"],
+            }
+            for it in self.ticket
+        ]
+
         try:
             ticket_label = f"{self.ticket_id:06d}"
             with open(path, "a", encoding="utf-8", newline="") as f:
@@ -669,8 +803,11 @@ class POS(QWidget):
             QMessageBox.information(self, "Cobrar", "Venta registrada y guardada.")
             self.set_status(f"Venta #{ticket_label} registrada correctamente.", "success")
             self.ensure_daily_backup(notify=False)
+            printed = self.print_ticket(ticket_label, ticket_snapshot, total, medio)
+            if not printed:
+                self.set_status("Ticket guardado, pero no se pudo imprimir.", "warning")
         except Exception as e:
-            log_error("Error al guardar ticket.", e)
+            log_error(f"Error al guardar ticket #{self.ticket_id:06d}.", e)
             self.set_status("Error al guardar la venta. Revisar logs.", "error")
             QMessageBox.critical(self, "Cobrar", f"Error al guardar:\n{e}")
 

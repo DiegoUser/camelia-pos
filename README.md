@@ -22,6 +22,7 @@ Aplicacion de escritorio desarrollada en **Python + PySide6**, con persistencia 
 - Codigo rapido / lector: escribir `ITEM_ID` o `ITEM_ID*3` y Enter.
 - Atajos: `Ctrl+Enter` (cobrar), `Ctrl+E` (exportar), `Ctrl+R` (resumen), `Ctrl+L` (codigo rapido), `F11` (modo kiosco), `Esc` (salir de kiosco).
 - Modo kiosco a pantalla completa (boton dedicado o tecla `F11`, salir con `Esc`).
+- Impresion automatica al cobrar (requiere `pywin32` y una impresora configurada; se usa la definida en `POS_PRINTER` o la predeterminada de Windows. Si la predeterminada es “Microsoft Print to PDF”, se guarda un PDF en la carpeta Documentos).
 - IDs de ticket continuos entre sesiones.
 - Ejecutable portable (PyInstaller).
 
@@ -53,6 +54,7 @@ app/
 
 ```bash
 pip install PySide6 pandas openpyxl pillow
+pip install pywin32
 ```
 
 2. Ejecutar:
@@ -69,6 +71,7 @@ pyinstaller --clean --name Avocado --onefile --noconsole --icon assets/icono.ico
 ```
 
 4. Logs de errores: se generan automaticamente en `logs.txt` junto al ejecutable (o en la carpeta donde se copie el `.exe`). El archivo queda creado desde el arranque para que el staff lo pueda compartir ante incidentes. Todos los archivos (data/, assets/, backups, resumenes) se crean en la misma carpeta del ejecutable para facilitar su respaldo.
+5. Opcional: definir la variable de entorno `POS_PRINTER` si se quiere forzar una impresora distinta a la predeterminada de Windows (por defecto se usa la impresora por defecto del sistema).
 
 ---
 
