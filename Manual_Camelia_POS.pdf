@@ -3,23 +3,23 @@
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 2 0 obj
-<< /Length 2162 >>
+<< /Length 2165 >>
 stream
 BT
 /F1 12 Tf
 14 TL
 72 770 Td
-(Cafeteria POS - Manual de Usuario) Tj
+(Camelia POS - Manual de Usuario) Tj
 T*
 (Version MVP 1.0) Tj
 T*
-(Actualizado: 2025-11-06) Tj
+(Actualizado: 2025-11-11) Tj
 T*
 (--------------------------------------------------) Tj
 T*
 (1. Contenido del paquete) Tj
 T*
-( - Carpeta "Cafeteria POS" con main.exe, data/, assets/ y logs.txt \(se crea solo\).) Tj
+( - Carpeta "Camelia POS" con Camelia.exe, data/, assets/ y logs.txt \(se crea solo\).) Tj
 T*
 ( - No se requiere instalar Python ni dependencias adicionales.) Tj
 T*
@@ -27,17 +27,17 @@ T*
 T*
 (2. Instalacion) Tj
 T*
-( 1. Copiar la carpeta completa a la PC de caja \(por ejemplo C:/Apps/CafeteriaPOS\).) Tj
+( 1. Copiar la carpeta completa a la PC de caja \(por ejemplo C:/Apps/CameliaPOS\).) Tj
 T*
 ( 2. Verificar que la carpeta tenga permisos de lectura y escritura.) Tj
 T*
-( 3. Crear un acceso directo a main.exe en el escritorio si se desea.) Tj
+( 3. Crear un acceso directo a Camelia.exe en el escritorio si se desea.) Tj
 T*
 () Tj
 T*
 (3. Puesta en marcha diaria) Tj
 T*
-( 1. Hacer doble click en main.exe.) Tj
+( 1. Hacer doble click en Camelia.exe.) Tj
 T*
 ( 2. Esperar a que aparezca la ventana principal con la grilla de productos y el ticket vacio.) Tj
 T*
@@ -92,13 +92,15 @@ ET
 endstream
 endobj
 3 0 obj
-<< /Length 373 >>
+<< /Length 439 >>
 stream
 BT
 /F1 12 Tf
 14 TL
 72 770 Td
 ( - Ctrl+L: Enfocar la caja de Codigo rapido.) Tj
+T*
+( - F11: Alternar modo kiosco, Esc: salir del modo kiosco.) Tj
 T*
 () Tj
 T*
@@ -129,13 +131,13 @@ xref
 0000000000 65535 f 
 0000000009 00000 n 
 0000000079 00000 n 
-0000002293 00000 n 
-0000002717 00000 n 
-0000002782 00000 n 
-0000002908 00000 n 
-0000003034 00000 n 
+0000002296 00000 n 
+0000002786 00000 n 
+0000002851 00000 n 
+0000002977 00000 n 
+0000003103 00000 n 
 trailer
 << /Size 8 /Root 7 0 R >>
 startxref
-3083
+3152
 %%EOF

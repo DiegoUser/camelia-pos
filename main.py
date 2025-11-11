@@ -36,7 +36,7 @@ def sanitize_pdf_text(text: str) -> str:
     return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
 
 
-def write_text_pdf(path: Path, lines, title="Ticket Avocado"):
+def write_text_pdf(path: Path, lines, title="Ticket Camelia"):
     lines = [line.encode("ascii", "ignore").decode("ascii") for line in lines]
     chunks = [lines[i:i + 40] for i in range(0, len(lines), 40)] or [[""]]
     objects = []
@@ -258,7 +258,7 @@ class POS(QWidget):
         self.current_day = datetime.date.today()
         self.last_backup_signature = None
         self.shortcuts = []
-        self.settings = QSettings("AvocadoPOS", "CafeteriaPOS")
+        self.settings = QSettings("CameliaPOS", "CafeteriaPOS")
         self.kiosk_enabled = self.settings.value("kiosk_enabled", False, type=bool)
         self.refresh_sales_target(force=True)
         self.generate_daily_summary(self.current_day - datetime.timedelta(days=1), mode="auto")
@@ -715,7 +715,7 @@ class POS(QWidget):
 
         try:
             handle = win32print.OpenPrinter(printer)
-            job = win32print.StartDocPrinter(handle, 1, ("Ticket Avocado", None, "RAW"))
+            job = win32print.StartDocPrinter(handle, 1, ("Ticket Camelia", None, "RAW"))
             win32print.StartPagePrinter(handle)
             win32print.WritePrinter(handle, content.encode("utf-8"))
             win32print.EndPagePrinter(handle)

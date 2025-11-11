@@ -16,12 +16,12 @@ VSVersionInfo(
       StringTable(
         '0C0A04B0',
         [
-          StringStruct('CompanyName', 'Avocado'),
+          StringStruct('CompanyName', 'Camelia'),
           StringStruct('FileDescription', 'Cafeteria POS'),
           StringStruct('FileVersion', '1.0.0'),
-          StringStruct('InternalName', 'Avocado'),
-          StringStruct('LegalCopyright', '© 2025 Avocado'),
-          StringStruct('OriginalFilename', 'Avocado.exe'),
+          StringStruct('InternalName', 'Camelia'),
+          StringStruct('LegalCopyright', '© 2025 Camelia'),
+          StringStruct('OriginalFilename', 'Camelia.exe'),
           StringStruct('ProductName', 'Cafeteria POS'),
           StringStruct('ProductVersion', '1.0.0')
         ]
