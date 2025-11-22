@@ -9,7 +9,8 @@ Aplicacion de escritorio desarrollada en **Python + PySide6**, con persistencia 
 
 - Interfaz grafica moderna y simple.
 - Menu lateral de categorias con grilla de productos con imagenes.
-- Ticket con calculo automatico de totales y seleccion de medio de pago.
+- Ticket editable: se pueden cambiar cantidades, quitar items, limpiar todo y aplicar descuentos generales o por producto.
+- Ticket con calculo automatico de totales, bonificaciones y seleccion de medio de pago.
 - Confirmacion de cobro antes de guardar cada venta.
 - Validacion de productos y precios (sin nombres vacios ni valores menores o iguales a 0).
 - Control automatico del CSV mensual (detecta cambio de mes y reinicia IDs).
@@ -20,8 +21,10 @@ Aplicacion de escritorio desarrollada en **Python + PySide6**, con persistencia 
 - Registro de errores en `logs.txt` (con traceback) para soporte rapido.
 - Indicador de estado permanente (exito/error) visible para el cajero.
 - Codigo rapido / lector: escribir `ITEM_ID` o `ITEM_ID*3` y Enter.
-- Atajos: `Ctrl+Enter` (cobrar), `Ctrl+E` (exportar), `Ctrl+R` (resumen), `Ctrl+L` (codigo rapido), `F11` (modo kiosco), `Esc` (salir de kiosco).
-- Modo kiosco a pantalla completa (boton dedicado o tecla `F11`, salir con `Esc`).
+- Atajos: `Ctrl+Enter` (cobrar), `Ctrl+E` (exportar), `Ctrl+R` (resumen), `Ctrl+L` (codigo rapido), `F1` (info/atajos), `F2` (modo kiosco), `Esc` (salir de kiosco).
+- Boton de ayuda/atajos (o `F1`) con listado rapido para el personal.
+- Ticket impreso con bordes, detalle de descuentos aplicados y comando de corte automatico (ESC/POS) al final.
+- Modo kiosco a pantalla completa (boton dedicado o tecla `F2`, salir con `Esc`).
 - Impresion automatica al cobrar (requiere `pywin32` y una impresora configurada; se usa la definida en `POS_PRINTER` o la predeterminada de Windows. Si la predeterminada es “Microsoft Print to PDF”, se guarda un PDF en la carpeta Documentos).
 - IDs de ticket continuos entre sesiones.
 - Ejecutable portable (PyInstaller).
@@ -63,7 +66,7 @@ pip install pywin32
 python main.py
 ```
 
-3. (Opcional) Empaquetar a `.exe`:
+3. Empaquetar a `.exe`:
 
 ```bash
 pip install pyinstaller
@@ -72,19 +75,6 @@ pyinstaller --clean --name Camelia --onefile --noconsole --icon assets/icono.ico
 
 4. Logs de errores: se generan automaticamente en `logs.txt` junto al ejecutable (o en la carpeta donde se copie el `.exe`). El archivo queda creado desde el arranque para que el staff lo pueda compartir ante incidentes. Todos los archivos (data/, assets/, backups, resumenes) se crean en la misma carpeta del ejecutable para facilitar su respaldo.
 5. Opcional: definir la variable de entorno `POS_PRINTER` si se quiere forzar una impresora distinta a la predeterminada de Windows (por defecto se usa la impresora por defecto del sistema).
-
----
-
-## Features recomendadas para salida a produccion (MVP)
-
-1. Confirmacion de cobro antes de registrar la venta (**implementado**).
-2. Logs de errores en `logs.txt` (**implementado**).
-3. Validacion de precios y productos al leer/guardar (**implementado**).
-4. Control de mes automatico (archivos por mes se crean solos) (**implementado**).
-5. Backup automatico diario del CSV actual (**implementado**).
-6. Mensaje de exito/error siempre visible (feedback visual al cajero) (**implementado**).
-7. Resumen automatico al cierre del dia + boton manual (**implementado**).
-8. Proteccion ante cierre accidental (flush+fsync ya implementado).
 
 ---
 
