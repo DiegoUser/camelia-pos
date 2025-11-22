@@ -1,2 +1,3 @@
-Revisar como estan funcionando los logs (se generaron solo 2 y hubieron varias sesiones)
 Agregar boton de bonificaciones (por ej 2x1, o 10% de desc)(debe poder aplicarse al ticket entero(o sea el porcentaje a todo), o manualmente por item)
+Actualmente no se pueden editar ni quitar elementos ya agregados al ticket(esto no debe generar log)
+Actualmente no se puede limpiar el ticket para empezar de 0(esto no debe generar log)

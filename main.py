@@ -105,19 +105,28 @@ def ensure_log_file():
         pass
 
 
-def log_error(message: str, exc: Exception | None = None):
-    """Persist simple timestamped logs for soporte."""
+def _write_log(prefix: str, message: str, exc: Exception | None = None):
     try:
         ensure_log_file()
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(LOG_FILE, "a", encoding="utf-8") as log:
-            log.write(f"[{timestamp}] {message}\n")
+            log.write(f"[{timestamp}] {prefix} {message}\n")
             if exc:
                 log.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
             log.write("\n")
     except Exception:
         # No hacemos nada si fallan los logs para no romper el flujo principal.
         pass
+
+
+def log_error(message: str, exc: Exception | None = None):
+    """Persiste errores en logs.txt."""
+    _write_log("ERROR", message, exc)
+
+
+def log_event(message: str):
+    """Log simple para auditoria de sesiones/acciones."""
+    _write_log("INFO ", message)
 
 # --- Utilidades de datos ---
 def ensure_runtime_payload():
@@ -263,6 +272,7 @@ class POS(QWidget):
         self.kiosk_enabled = self.settings.value("kiosk_enabled", False, type=bool)
         self.refresh_sales_target(force=True)
         self.generate_daily_summary(self.current_day - datetime.timedelta(days=1), mode="auto")
+        log_event("Sesion POS iniciada.")
 
         # ----- Buscador (definido ANTES de señales) -----
         self.search = QLineEdit()
@@ -440,6 +450,10 @@ class POS(QWidget):
             "- Activa el modo kiosco para trabajar en pantalla completa durante la atencion.",
         ]
         QMessageBox.information(self, "Atajos y ayuda", "\n".join(lines))
+
+    def closeEvent(self, event):
+        log_event("Sesion POS finalizada.")
+        super().closeEvent(event)
 
     def focus_code_input(self):
         self.code_input.setFocus()
@@ -843,6 +857,7 @@ class POS(QWidget):
             self.refresh_ticket(keep_status=True)
             QMessageBox.information(self, "Cobrar", "Venta registrada y guardada.")
             self.set_status(f"Venta #{ticket_label} registrada correctamente.", "success")
+            log_event(f"Venta #{ticket_label} cobrada. Total ${total:,.2f} via {medio}.")
             self.ensure_daily_backup(notify=False)
             printed = self.print_ticket(ticket_label, ticket_snapshot, total, medio)
             if not printed:
@@ -883,6 +898,7 @@ class POS(QWidget):
                     pass
             QMessageBox.information(self, "Exportar", f"Exportado a:\n{dest_path}")
             self.set_status(f"Ventas exportadas a {dest_path}.", "success")
+            log_event(f"Export de ventas generado en {dest_path}.")
         except Exception as e:
             log_error("Error exportando a Excel.", e)
             self.set_status("Error exportando a Excel. Revisar logs.", "error")
