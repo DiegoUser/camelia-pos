@@ -30,6 +30,7 @@ LOG_FILE   = APP_DIR / "logs.txt"
 BACKUP_DIR = DATA_DIR / "historial" / "backups"
 SUMMARY_DIR = DATA_DIR / "historial" / "resumenes"
 PRINTER_NAME = os.environ.get("POS_PRINTER")
+CUT_COMMAND = b"\x1d\x56\x00"  # ESC/POS: full cut after imprimir
 
 
 def sanitize_pdf_text(text: str) -> str:
@@ -739,6 +740,9 @@ class POS(QWidget):
             ]
         )
         content = "\r\n".join(lines) + "\r\n\r\n"
+        payload = content.encode("utf-8")
+        if CUT_COMMAND:
+            payload += CUT_COMMAND
 
         if printer and "pdf" in printer.lower():
             pdf_path = Path.home() / "Documents" / f"Ticket_{ticket_label}.pdf"
@@ -754,7 +758,7 @@ class POS(QWidget):
             handle = win32print.OpenPrinter(printer)
             job = win32print.StartDocPrinter(handle, 1, ("Ticket Camelia", None, "RAW"))
             win32print.StartPagePrinter(handle)
-            win32print.WritePrinter(handle, content.encode("utf-8"))
+            win32print.WritePrinter(handle, payload)
             win32print.EndPagePrinter(handle)
             win32print.EndDocPrinter(handle)
             win32print.ClosePrinter(handle)

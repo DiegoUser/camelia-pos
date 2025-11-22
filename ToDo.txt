@@ -1,3 +1,2 @@
-Mandar comando a la impresora para que se corte al final del ticket
 Revisar como estan funcionando los logs (se generaron solo 2 y hubieron varias sesiones)
 Agregar boton de bonificaciones (por ej 2x1, o 10% de desc)(debe poder aplicarse al ticket entero(o sea el porcentaje a todo), o manualmente por item)
