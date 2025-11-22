@@ -270,6 +270,7 @@ class POS(QWidget):
         self.shortcuts = []
         self.settings = QSettings("CameliaPOS", "CafeteriaPOS")
         self.kiosk_enabled = self.settings.value("kiosk_enabled", False, type=bool)
+        self.ticket_discount = 0.0
         self.refresh_sales_target(force=True)
         self.generate_daily_summary(self.current_day - datetime.timedelta(days=1), mode="auto")
         log_event("Sesion POS iniciada.")
@@ -344,11 +345,13 @@ class POS(QWidget):
         btn_resumen = QPushButton("Resumen diario"); btn_resumen.clicked.connect(self.manual_daily_summary)
         btn_info = QPushButton("Info / Ayuda"); btn_info.clicked.connect(self.show_help_info)
         btn_clear = QPushButton("Limpiar ticket"); btn_clear.clicked.connect(self.clear_ticket)
+        btn_bonus = QPushButton("Bonificaciones"); btn_bonus.clicked.connect(self.manage_discounts)
         btn_kiosk = QPushButton("Modo kiosco"); btn_kiosk.setCheckable(True)
         btn_kiosk.setChecked(self.kiosk_enabled)
         btn_kiosk.toggled.connect(self.set_kiosk_state)
         self.btn_kiosk = btn_kiosk
-        for b in (btn_cobrar, btn_export, btn_resumen, btn_info, btn_clear, btn_kiosk):
+        self.btn_bonus = btn_bonus
+        for b in (btn_cobrar, btn_export, btn_resumen, btn_info, btn_clear, btn_bonus, btn_kiosk):
             b.setMinimumHeight(36)
             b.setStyleSheet(
                 "QPushButton { background:#7a2cff; color:white; border:0; border-radius:8px; padding:8px; }"
@@ -373,6 +376,7 @@ class POS(QWidget):
         right.addWidget(self.mpago)
         right.addWidget(btn_resumen)
         right.addWidget(btn_kiosk)
+        right.addWidget(btn_bonus)
         right.addWidget(btn_clear)
         right.addWidget(btn_info)
         right.addWidget(btn_export)
@@ -519,17 +523,46 @@ class POS(QWidget):
                 it["cant"] += cant
                 self.refresh_ticket(keep_status=keep_status)
                 return
-        self.ticket.append({"prod": prod, "cant": cant})
+        self.ticket.append({"prod": prod, "cant": cant, "discount": 0.0})
         self.refresh_ticket(keep_status=keep_status)
+
+    def ticket_entries(self):
+        entries = []
+        subtotal = 0.0
+        for it in self.ticket:
+            discount = max(0.0, float(it.get("discount", 0.0)))
+            prod = it["prod"]
+            base_price = float(prod["precio"])
+            net_unit = base_price * (1 - discount / 100)
+            line_total = net_unit * it["cant"]
+            subtotal += line_total
+            entries.append(
+                {
+                    "prod": prod,
+                    "cant": it["cant"],
+                    "discount": discount,
+                    "unit_price": net_unit,
+                    "line_total": line_total,
+                }
+            )
+        global_discount = subtotal * (self.ticket_discount / 100)
+        total = subtotal - global_discount
+        return entries, subtotal, global_discount, total
 
     def refresh_ticket(self, keep_status=False):
         self.ticket_list.clear()
-        total = 0.0
-        for it in self.ticket:
-            p, c = it["prod"], it["cant"]
-            st = p["precio"] * c
-            total += st
-            self.ticket_list.addItem(f"{c} x {p['item_desc']}  ->  ${st:,.2f}")
+        entries, subtotal, global_disc, total = self.ticket_entries()
+        for entry in entries:
+            prod = entry["prod"]
+            label = f"{entry['cant']} x {prod['item_desc']}"
+            if entry["discount"]:
+                label += f" (-{entry['discount']:.2f}%)"
+            label += f"  ->  ${entry['line_total']:,.2f}"
+            self.ticket_list.addItem(label)
+        if self.ticket_discount and subtotal:
+            self.ticket_list.addItem(
+                f"Descuento ticket {self.ticket_discount:.2f}%  ->  -${global_disc:,.2f}"
+            )
         self.total_lbl.setText(f"Total: ${total:,.2f}")
         if not keep_status:
             self.update_ticket_status(total)
@@ -596,8 +629,86 @@ class POS(QWidget):
         confirm.button(QMessageBox.No).setText("No")
         if confirm.exec() == QMessageBox.Yes:
             self.ticket.clear()
+            self.ticket_discount = 0.0
             self.refresh_ticket()
             self.set_status("Ticket limpiado. Puedes comenzar de nuevo.", "info")
+
+    def manage_discounts(self):
+        if not self.ticket:
+            QMessageBox.information(self, "Bonificaciones", "Agrega productos al ticket antes de aplicar descuentos.")
+            return
+        menu = QMenu(self)
+        act_global = menu.addAction("Descuento general (%)")
+        act_item = menu.addAction("Descuento por item (%)")
+        act_clear = menu.addAction("Quitar todos los descuentos")
+        pos = self.btn_bonus.mapToGlobal(self.btn_bonus.rect().bottomLeft())
+        chosen = menu.exec(pos)
+        if chosen == act_global:
+            self.prompt_global_discount()
+        elif chosen == act_item:
+            self.prompt_item_discount()
+        elif chosen == act_clear:
+            self.reset_discounts()
+
+    def prompt_global_discount(self):
+        pct, ok = QInputDialog.getDouble(
+            self,
+            "Descuento general",
+            "Porcentaje a aplicar sobre el total:",
+            value=self.ticket_discount,
+            minValue=0,
+            maxValue=100,
+            decimals=2,
+        )
+        if ok:
+            self.ticket_discount = pct
+            self.refresh_ticket()
+            if pct:
+                self.set_status(f"Descuento general aplicado: {pct:.2f}%.", "success")
+            else:
+                self.set_status("Descuento general eliminado.", "info")
+
+    def prompt_item_discount(self):
+        options = [f"{idx+1}. {it['prod']['item_desc']} (x{it['cant']})" for idx, it in enumerate(self.ticket)]
+        if not options:
+            return
+        choice, ok = QInputDialog.getItem(
+            self,
+            "Descuento por item",
+            "Elegir producto:",
+            options,
+            0,
+            False,
+        )
+        if not ok:
+            return
+        row = options.index(choice)
+        current = float(self.ticket[row].get("discount", 0.0))
+        pct, ok = QInputDialog.getDouble(
+            self,
+            "Descuento por item",
+            "Porcentaje a aplicar (0 para quitar):",
+            value=current,
+            minValue=0,
+            maxValue=100,
+            decimals=2,
+        )
+        if ok:
+            self.ticket[row]["discount"] = pct
+            self.refresh_ticket()
+            if pct:
+                self.set_status(f"Descuento {pct:.2f}% aplicado a {self.ticket[row]['prod']['item_desc']}.", "success")
+            else:
+                self.set_status("Descuento del item eliminado.", "info")
+
+    def reset_discounts(self):
+        changed = bool(self.ticket_discount or any(it.get("discount") for it in self.ticket))
+        self.ticket_discount = 0.0
+        for it in self.ticket:
+            it["discount"] = 0.0
+        self.refresh_ticket()
+        if changed:
+            self.set_status("Todos los descuentos fueron quitados.", "info")
 
     def set_status(self, message, level="info"):
         colors = {
@@ -626,7 +737,8 @@ class POS(QWidget):
         self.set_status("Productos invalidos fueron omitidos del menu.", "warning")
 
     def ticket_total(self):
-        return sum(it["prod"]["precio"] * it["cant"] for it in self.ticket)
+        *_, total = self.ticket_entries()
+        return total
 
     def refresh_sales_target(self, force=False):
         period = datetime.datetime.now().strftime("%Y-%m")
@@ -795,9 +907,15 @@ class POS(QWidget):
         border = "-" * line_width
         divider = "-" * line_width
 
-        def format_line(desc, qty, price):
-            subtotal = qty * price
-            return f"{qty:>2} x {desc:.26} ${subtotal:>7.2f}"
+        def format_line(item):
+            desc = item["desc"]
+            qty = item["cant"]
+            subtotal = item["subtotal"]
+            text = f"{qty:>2} x {desc:.26}"
+            discount = float(item.get("discount") or 0.0)
+            if discount:
+                text += f" (-{discount:.2f}%)"
+            return f"{text} ${subtotal:>7.2f}"
 
         lines = [
             border,
@@ -808,7 +926,7 @@ class POS(QWidget):
             divider,
         ]
         for item in items_snapshot:
-            lines.append(wrap_line(format_line(item["desc"], item["cant"], item["precio"])))
+            lines.append(wrap_line(format_line(item)))
         lines.extend(
             [
                 divider,
@@ -851,7 +969,15 @@ class POS(QWidget):
             return False
 
     def confirm_checkout(self, total, medio):
-        lines = [f"{it['cant']} x {it['prod']['item_desc']}" for it in self.ticket]
+        entries, _, global_disc, _ = self.ticket_entries()
+        lines = []
+        for entry in entries:
+            txt = f"{entry['cant']} x {entry['prod']['item_desc']}"
+            if entry["discount"]:
+                txt += f" (-{entry['discount']:.2f}%)"
+            lines.append(txt)
+        if self.ticket_discount and global_disc:
+            lines.append(f"Descuento ticket {self.ticket_discount:.2f}% (-${global_disc:,.2f})")
         if len(lines) > 5:
             extra = len(lines) - 5
             lines = lines[:5] + [f"... ({extra} items mas)"]
@@ -893,34 +1019,62 @@ class POS(QWidget):
         path = self.sales_path or current_sales_path()
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         medio = self.mpago.currentText() if hasattr(self, "mpago") else "Efectivo"
-        total = self.ticket_total()
+        entries, subtotal, global_disc, total = self.ticket_entries()
 
         if not self.confirm_checkout(total, medio):
             return
 
         ticket_snapshot = [
             {
-                "desc": it["prod"]["item_desc"],
-                "cant": it["cant"],
-                "precio": it["prod"]["precio"],
+                "item_id": entry["prod"]["item_id"],
+                "categoria": entry["prod"]["categoria"],
+                "desc": entry["prod"]["item_desc"],
+                "cant": entry["cant"],
+                "unit_price": entry["unit_price"],
+                "subtotal": entry["line_total"],
+                "discount": entry["discount"],
             }
-            for it in self.ticket
+            for entry in entries
         ]
+        if self.ticket_discount and subtotal:
+            ticket_snapshot.append(
+                {
+                    "item_id": "DESC_TICKET",
+                    "categoria": "Descuentos",
+                    "desc": "Descuento ticket",
+                    "cant": 1,
+                    "unit_price": -global_disc,
+                    "subtotal": -global_disc,
+                    "discount": self.ticket_discount,
+                }
+            )
 
         try:
             ticket_label = f"{self.ticket_id:06d}"
             with open(path, "a", encoding="utf-8", newline="") as f:
                 w = csv.writer(f)
-                for it in self.ticket:
-                    p, c = it["prod"], it["cant"]
-                    st = p["precio"] * c
-                    w.writerow([now, ticket_label, p["item_id"], p["item_desc"],
-                                p["categoria"], c, p["precio"], st, medio, "Cajero", ""])
+                for item in ticket_snapshot:
+                    w.writerow(
+                        [
+                            now,
+                            ticket_label,
+                            item["item_id"],
+                            item["desc"],
+                            item["categoria"],
+                            item["cant"],
+                            f"{item['unit_price']:.2f}",
+                            f"{item['subtotal']:.2f}",
+                            medio,
+                            "Cajero",
+                            "",
+                        ]
+                    )
                 f.flush()
                 os.fsync(f.fileno())
 
             self.ticket_id += 1
             self.ticket = []
+            self.ticket_discount = 0.0
             self.refresh_ticket(keep_status=True)
             QMessageBox.information(self, "Cobrar", "Venta registrada y guardada.")
             self.set_status(f"Venta #{ticket_label} registrada correctamente.", "success")
