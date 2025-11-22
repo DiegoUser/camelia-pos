@@ -7,7 +7,7 @@ from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QListWidget, QListWidgetItem, QLineEdit, QScrollArea, QFileDialog,
-    QMessageBox, QSplitter, QComboBox
+    QMessageBox, QSplitter, QComboBox, QInputDialog, QMenu
 )
 
 # --- Rutas base ---
@@ -309,6 +309,11 @@ class POS(QWidget):
 
         # ----- Ticket / derecha -----
         self.ticket_list = QListWidget()
+        self.ticket_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.ticket_list.customContextMenuRequested.connect(self.show_ticket_menu)
+        self.ticket_list.itemDoubleClicked.connect(
+            lambda item: self.edit_ticket_row(self.ticket_list.row(item))
+        )
         self.ticket_list.setStyleSheet("""
             QListWidget {
                 background:#2b2b2b;
@@ -338,11 +343,12 @@ class POS(QWidget):
         btn_export = QPushButton("Exportar a Excel"); btn_export.clicked.connect(self.export_excel)
         btn_resumen = QPushButton("Resumen diario"); btn_resumen.clicked.connect(self.manual_daily_summary)
         btn_info = QPushButton("Info / Ayuda"); btn_info.clicked.connect(self.show_help_info)
+        btn_clear = QPushButton("Limpiar ticket"); btn_clear.clicked.connect(self.clear_ticket)
         btn_kiosk = QPushButton("Modo kiosco"); btn_kiosk.setCheckable(True)
         btn_kiosk.setChecked(self.kiosk_enabled)
         btn_kiosk.toggled.connect(self.set_kiosk_state)
         self.btn_kiosk = btn_kiosk
-        for b in (btn_cobrar, btn_export, btn_resumen, btn_info, btn_kiosk):
+        for b in (btn_cobrar, btn_export, btn_resumen, btn_info, btn_clear, btn_kiosk):
             b.setMinimumHeight(36)
             b.setStyleSheet(
                 "QPushButton { background:#7a2cff; color:white; border:0; border-radius:8px; padding:8px; }"
@@ -367,6 +373,7 @@ class POS(QWidget):
         right.addWidget(self.mpago)
         right.addWidget(btn_resumen)
         right.addWidget(btn_kiosk)
+        right.addWidget(btn_clear)
         right.addWidget(btn_info)
         right.addWidget(btn_export)
         right.addWidget(btn_cobrar)
@@ -533,6 +540,64 @@ class POS(QWidget):
             return
         items = sum(it["cant"] for it in self.ticket)
         self.set_status(f"Ticket con {items} items. Total ${total:,.2f}", "info")
+
+    def show_ticket_menu(self, pos):
+        item = self.ticket_list.itemAt(pos)
+        if not item:
+            return
+        row = self.ticket_list.row(item)
+        menu = QMenu(self)
+        edit_action = menu.addAction("Editar cantidad")
+        delete_action = menu.addAction("Quitar item")
+        chosen = menu.exec(self.ticket_list.viewport().mapToGlobal(pos))
+        if chosen == edit_action:
+            self.edit_ticket_row(row)
+        elif chosen == delete_action:
+            self.delete_ticket_row(row)
+
+    def edit_ticket_row(self, row):
+        if row < 0 or row >= len(self.ticket):
+            return
+        entry = self.ticket[row]
+        prod = entry["prod"]
+        current = entry["cant"]
+        qty, ok = QInputDialog.getInt(
+            self,
+            "Editar cantidad",
+            f"Cantidad para {prod['item_desc']}",
+            value=current,
+            minValue=1,
+            maxValue=999,
+        )
+        if ok and qty != current:
+            entry["cant"] = qty
+            self.refresh_ticket()
+            self.set_status(f"Cantidad actualizada: {prod['item_desc']} x {qty}.", "success")
+
+    def delete_ticket_row(self, row):
+        if row < 0 or row >= len(self.ticket):
+            return
+        prod = self.ticket[row]["prod"]
+        del self.ticket[row]
+        self.refresh_ticket()
+        self.set_status(f"{prod['item_desc']} eliminado del ticket.", "info")
+
+    def clear_ticket(self):
+        if not self.ticket:
+            self.set_status("El ticket ya esta vacio.", "info")
+            return
+        confirm = QMessageBox(self)
+        confirm.setWindowTitle("Limpiar ticket")
+        confirm.setIcon(QMessageBox.Question)
+        confirm.setText("Esto quitara todos los productos del ticket actual. Continuar?")
+        confirm.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        confirm.setDefaultButton(QMessageBox.No)
+        confirm.button(QMessageBox.Yes).setText("Sí")
+        confirm.button(QMessageBox.No).setText("No")
+        if confirm.exec() == QMessageBox.Yes:
+            self.ticket.clear()
+            self.refresh_ticket()
+            self.set_status("Ticket limpiado. Puedes comenzar de nuevo.", "info")
 
     def set_status(self, message, level="info"):
         colors = {
@@ -800,6 +865,8 @@ class POS(QWidget):
             confirm.setInformativeText(details)
         confirm.setStandardButtons(QMessageBox.Cancel | QMessageBox.Ok)
         confirm.setDefaultButton(QMessageBox.Ok)
+        confirm.button(QMessageBox.Ok).setText("Confirmar")
+        confirm.button(QMessageBox.Cancel).setText("Cancelar")
         return confirm.exec() == QMessageBox.Ok
 
     # ---- Acciones ----
