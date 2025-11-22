@@ -299,7 +299,14 @@ class POS(QWidget):
         # ----- Ticket / derecha -----
         self.ticket_list = QListWidget()
         self.ticket_list.setStyleSheet("""
-            QListWidget { background:#2b2b2b; color:#e6e6e6; border:1px solid #3a3a3a; border-radius:8px; }
+            QListWidget {
+                background:#2b2b2b;
+                color:#e6e6e6;
+                border:2px solid #7a2cff;
+                border-radius:12px;
+                padding:8px;
+            }
+            QListWidget::item { padding:4px 2px; }
         """)
 
         self.mpago = QComboBox()
@@ -319,11 +326,12 @@ class POS(QWidget):
         btn_cobrar = QPushButton("Cobrar"); btn_cobrar.clicked.connect(self.checkout)
         btn_export = QPushButton("Exportar a Excel"); btn_export.clicked.connect(self.export_excel)
         btn_resumen = QPushButton("Resumen diario"); btn_resumen.clicked.connect(self.manual_daily_summary)
+        btn_info = QPushButton("Info / Ayuda"); btn_info.clicked.connect(self.show_help_info)
         btn_kiosk = QPushButton("Modo kiosco"); btn_kiosk.setCheckable(True)
         btn_kiosk.setChecked(self.kiosk_enabled)
         btn_kiosk.toggled.connect(self.set_kiosk_state)
         self.btn_kiosk = btn_kiosk
-        for b in (btn_cobrar, btn_export, btn_resumen, btn_kiosk):
+        for b in (btn_cobrar, btn_export, btn_resumen, btn_info, btn_kiosk):
             b.setMinimumHeight(36)
             b.setStyleSheet(
                 "QPushButton { background:#7a2cff; color:white; border:0; border-radius:8px; padding:8px; }"
@@ -348,6 +356,7 @@ class POS(QWidget):
         right.addWidget(self.mpago)
         right.addWidget(btn_resumen)
         right.addWidget(btn_kiosk)
+        right.addWidget(btn_info)
         right.addWidget(btn_export)
         right.addWidget(btn_cobrar)
         right_widget = QWidget(); right_widget.setLayout(right)
@@ -405,6 +414,7 @@ class POS(QWidget):
             ("Ctrl+E", self.export_excel),
             ("Ctrl+R", self.manual_daily_summary),
             ("Ctrl+L", self.focus_code_input),
+            ("F1", self.show_help_info),
             ("F2", self.toggle_kiosk),
             ("Esc", self.exit_kiosk_if_needed),
         ]
@@ -412,6 +422,23 @@ class POS(QWidget):
             sc = QShortcut(QKeySequence(seq), self)
             sc.activated.connect(handler)
             self.shortcuts.append(sc)
+
+    def show_help_info(self):
+        lines = [
+            "Atajos disponibles:",
+            "- Ctrl+Enter / Ctrl+Return: Cobrar",
+            "- Ctrl+E: Exportar a Excel",
+            "- Ctrl+R: Resumen diario",
+            "- Ctrl+L: Enfocar el campo Codigo rapido",
+            "- F1: Ver atajos y ayuda general",
+            "- F2: Alternar modo kiosco",
+            "- Esc: Salir de kiosco o cancelar pantalla completa",
+            "",
+            "Tips rapidos:",
+            "- Usa el campo 'Codigo rapido' para cargar productos por ID o ID*3 y presiona Enter.",
+            "- Activa el modo kiosco para trabajar en pantalla completa durante la atencion.",
+        ]
+        QMessageBox.information(self, "Atajos y ayuda", "\n".join(lines))
 
     def focus_code_input(self):
         self.code_input.setFocus()
@@ -680,25 +707,35 @@ class POS(QWidget):
             log_error(f"No se pudo resolver la impresora predeterminada para ticket #{ticket_label}.", exc)
             return False
 
+        line_width = 40
+
+        def wrap_line(text=""):
+            return (text or "")[:line_width]
+
+        border = "-" * line_width
+        divider = "-" * line_width
+
         def format_line(desc, qty, price):
             subtotal = qty * price
             return f"{qty:>2} x {desc:.26} ${subtotal:>7.2f}"
 
         lines = [
-            "Cafeteria POS",
-            f"Ticket #{ticket_label}",
-            datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            f"Pago: {medio}",
-            "-" * 32,
+            border,
+            wrap_line("Cafeteria POS"),
+            wrap_line(f"Ticket #{ticket_label}"),
+            wrap_line(datetime.datetime.now().strftime("%Y-%m-%d %H:%M")),
+            wrap_line(f"Pago: {medio}"),
+            divider,
         ]
         for item in items_snapshot:
-            lines.append(format_line(item["desc"], item["cant"], item["precio"]))
+            lines.append(wrap_line(format_line(item["desc"], item["cant"], item["precio"])))
         lines.extend(
             [
-                "-" * 32,
-                f"TOTAL: ${total:,.2f}",
-                "",
-                "Gracias por su compra!",
+                divider,
+                wrap_line(f"TOTAL: ${total:,.2f}"),
+                wrap_line(),
+                wrap_line("Gracias por su compra!"),
+                border,
             ]
         )
         content = "\r\n".join(lines) + "\r\n\r\n"
