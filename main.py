@@ -393,7 +393,7 @@ class POS(QWidget):
         for i in reversed(range(self.grid.count())):
             w = self.grid.itemAt(i).widget()
             if w: w.setParent(None)
-        cols = 4
+        cols = 3
         for idx, p in enumerate(items):
             r, c = divmod(idx, cols)
             self.grid.addWidget(ProductCard(p, self.add_item), r, c)
@@ -405,7 +405,7 @@ class POS(QWidget):
             ("Ctrl+E", self.export_excel),
             ("Ctrl+R", self.manual_daily_summary),
             ("Ctrl+L", self.focus_code_input),
-            ("F11", self.toggle_kiosk),
+            ("F2", self.toggle_kiosk),
             ("Esc", self.exit_kiosk_if_needed),
         ]
         for seq, handler in mappings:
@@ -457,7 +457,7 @@ class POS(QWidget):
         if self.kiosk_enabled:
             self.showFullScreen()
             self.setCursor(Qt.ArrowCursor)
-            self.set_status("Modo kiosco activo (F11 para salir).", "info")
+            self.set_status("Modo kiosco activo (F2 para salir).", "info")
         else:
             self.showNormal()
             self.setCursor(Qt.ArrowCursor)
