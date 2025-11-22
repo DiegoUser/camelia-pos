@@ -7,7 +7,7 @@ from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QListWidget, QListWidgetItem, QLineEdit, QScrollArea, QFileDialog,
-    QMessageBox, QSplitter, QComboBox, QInputDialog, QMenu
+    QMessageBox, QSplitter, QComboBox, QInputDialog, QMenu, QDialog
 )
 
 # --- Rutas base ---
@@ -581,10 +581,13 @@ class POS(QWidget):
         row = self.ticket_list.row(item)
         menu = QMenu(self)
         edit_action = menu.addAction("Editar cantidad")
+        discount_action = menu.addAction("Bonificar item")
         delete_action = menu.addAction("Quitar item")
         chosen = menu.exec(self.ticket_list.viewport().mapToGlobal(pos))
         if chosen == edit_action:
             self.edit_ticket_row(row)
+        elif chosen == discount_action:
+            self.prompt_item_discount(row=row)
         elif chosen == delete_action:
             self.delete_ticket_row(row)
 
@@ -651,14 +654,10 @@ class POS(QWidget):
             self.reset_discounts()
 
     def prompt_global_discount(self):
-        pct, ok = QInputDialog.getDouble(
-            self,
-            "Descuento general",
-            "Porcentaje a aplicar sobre el total:",
-            value=self.ticket_discount,
-            minValue=0,
-            maxValue=100,
-            decimals=2,
+        pct, ok = self.prompt_percentage(
+            title="Descuento general",
+            label="Porcentaje a aplicar sobre el total:",
+            initial=self.ticket_discount,
         )
         if ok:
             self.ticket_discount = pct
@@ -668,30 +667,29 @@ class POS(QWidget):
             else:
                 self.set_status("Descuento general eliminado.", "info")
 
-    def prompt_item_discount(self):
-        options = [f"{idx+1}. {it['prod']['item_desc']} (x{it['cant']})" for idx, it in enumerate(self.ticket)]
-        if not options:
+    def prompt_item_discount(self, row=None):
+        if not self.ticket:
             return
-        choice, ok = QInputDialog.getItem(
-            self,
-            "Descuento por item",
-            "Elegir producto:",
-            options,
-            0,
-            False,
-        )
-        if not ok:
+        if row is None:
+            options = [f"{idx+1}. {it['prod']['item_desc']} (x{it['cant']})" for idx, it in enumerate(self.ticket)]
+            choice, ok = QInputDialog.getItem(
+                self,
+                "Descuento por item",
+                "Elegir producto:",
+                options,
+                0,
+                False,
+            )
+            if not ok:
+                return
+            row = options.index(choice)
+        if row < 0 or row >= len(self.ticket):
             return
-        row = options.index(choice)
         current = float(self.ticket[row].get("discount", 0.0))
-        pct, ok = QInputDialog.getDouble(
-            self,
-            "Descuento por item",
-            "Porcentaje a aplicar (0 para quitar):",
-            value=current,
-            minValue=0,
-            maxValue=100,
-            decimals=2,
+        pct, ok = self.prompt_percentage(
+            title="Descuento por item",
+            label="Porcentaje a aplicar (0 para quitar):",
+            initial=current,
         )
         if ok:
             self.ticket[row]["discount"] = pct
@@ -709,6 +707,19 @@ class POS(QWidget):
         self.refresh_ticket()
         if changed:
             self.set_status("Todos los descuentos fueron quitados.", "info")
+
+    def prompt_percentage(self, title, label, initial, min_value=0.0, max_value=100.0):
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setLabelText(label)
+        dialog.setInputMode(QInputDialog.DoubleInput)
+        dialog.setDoubleDecimals(2)
+        dialog.setDoubleRange(min_value, max_value)
+        dialog.setDoubleValue(float(initial))
+        dialog.setOkButtonText("Aceptar")
+        dialog.setCancelButtonText("Cancelar")
+        accepted = dialog.exec() == QDialog.Accepted
+        return dialog.doubleValue(), accepted
 
     def set_status(self, message, level="info"):
         colors = {
