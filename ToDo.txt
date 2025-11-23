@@ -1,11 +1,2 @@
-Mejoras visuales app:
-- Cambiar acento y fondo: usar paleta teal/menta con grises suaves, mejorar contraste.
-- Jerarquizar panel derecho: titulos claros, total destacado, mensajes de estado con caja.
-- Cards de producto: bordes redondeados, sombra suave, hover/zoom, texto con nombre semibold y precio gris.
-- Botones: unificar altura, hover/pressed visibles, destacar Cobrar.
-- Categorias: estilo pill con highlight en seleccion y hover.
-- Inputs/busqueda: placeholder claro, borde acento en foco, boton limpiar.
-- Feedback rapido: flash/badge al agregar producto (UI).
-- Capturas/ayuda visual: opcion de incluir iconos o mini tips.
-
-Primera iteracion: ajustar paleta, cards, botones, panel derecho, categorias y total.
+Mejoras visuales app pendientes:
+- Capturas/ayuda visual: incluir iconos o mini tips en la UI.

@@ -2,12 +2,13 @@
 import sys, os, csv, datetime, traceback, shutil
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QSettings, QTimer
 from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QListWidget, QListWidgetItem, QLineEdit, QScrollArea, QFileDialog,
-    QMessageBox, QSplitter, QComboBox, QInputDialog, QMenu, QDialog
+    QMessageBox, QSplitter, QComboBox, QInputDialog, QMenu, QDialog,
+    QGraphicsDropShadowEffect
 )
 
 # --- Rutas base ---
@@ -257,6 +258,13 @@ class ProductCard(QPushButton):
         v.addWidget(name); v.addWidget(price)
         self.clicked.connect(lambda: on_add(prod, 1, False))
 
+        # Sombra suave para separar cada card del fondo.
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(16)
+        shadow.setColor(Qt.black)
+        shadow.setOffset(0, 4)
+        self.setGraphicsEffect(shadow)
+
 # --- App principal ---
 class POS(QWidget):
     def __init__(self):
@@ -288,6 +296,7 @@ class POS(QWidget):
         # ----- Buscador (definido ANTES de senales) -----
         self.search = QLineEdit()
         self.search.setPlaceholderText("Buscar producto...")
+        self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self.apply_filters)
         self.search.setStyleSheet(
             "QLineEdit {"
@@ -328,22 +337,24 @@ class POS(QWidget):
         self.ticket_list.itemDoubleClicked.connect(
             lambda item: self.edit_ticket_row(self.ticket_list.row(item))
         )
-        self.ticket_list.setStyleSheet("""
-            QListWidget {
-                background:%s;
-                color:#f1f2f5;
-                border:1px solid %s;
-                border-radius:12px;
-                padding:10px;
-            }
-            QListWidget::item { padding:6px 2px; }
-        """ % (PANEL, ACCENT))
+        self.ticket_base_style = (
+            "QListWidget {"
+            f" background:{PANEL};"
+            " color:#f1f2f5;"
+            f" border:1px solid {ACCENT};"
+            " border-radius:12px;"
+            " padding:10px;"
+            "}"
+            "QListWidget::item { padding:6px 2px; }"
+        )
+        self.ticket_list.setStyleSheet(self.ticket_base_style)
 
         self.mpago = QComboBox()
         self.mpago.addItems(["Efectivo", "Tarjeta", "QR", "Debito"])
 
         self.code_input = QLineEdit()
         self.code_input.setPlaceholderText("Codigo rapido (ID o ID*3) y Enter")
+        self.code_input.setClearButtonEnabled(True)
         self.code_input.returnPressed.connect(self.handle_code_entry)
         self.code_input.setStyleSheet(
             "QLineEdit { background:#0f1114; color:#e6e9ef; border:1px solid #252a31; border-radius:10px; padding:8px; }"
@@ -544,9 +555,11 @@ class POS(QWidget):
             if it["prod"]["item_id"] == prod["item_id"]:
                 it["cant"] += cant
                 self.refresh_ticket(keep_status=keep_status)
+                self.flash_ticket()
                 return
         self.ticket.append({"prod": prod, "cant": cant, "discount": 0.0})
         self.refresh_ticket(keep_status=keep_status)
+        self.flash_ticket()
 
     def ticket_entries(self):
         entries = []
@@ -595,6 +608,18 @@ class POS(QWidget):
             return
         items = sum(it["cant"] for it in self.ticket)
         self.set_status(f"Ticket con {items} items. Total ${total:,.2f}", "info")
+
+    def flash_ticket(self):
+        highlight = (
+            "QListWidget {"
+            f" background:{PANEL};"
+            " color:#f1f2f5;"
+            " border:1px solid #ffd166;"
+            " border-radius:12px; padding:10px; }"
+            "QListWidget::item { padding:6px 2px; }"
+        )
+        self.ticket_list.setStyleSheet(highlight)
+        QTimer.singleShot(200, lambda: self.ticket_list.setStyleSheet(self.ticket_base_style))
 
     def show_ticket_menu(self, pos):
         item = self.ticket_list.itemAt(pos)
