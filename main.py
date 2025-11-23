@@ -405,18 +405,6 @@ class POS(QWidget):
         right.addWidget(QLabel("Codigo rapido / lector"))
         right.addWidget(self.code_input)
         right.addWidget(self.status_lbl)
-        self.tips_box = QLabel(
-            "Tips rapidos:\n"
-            "- Ctrl+Enter: Cobrar\n"
-            "- Ctrl+L: Ir a Codigo rapido\n"
-            "- F2: Modo kiosco; Esc para salir"
-        )
-        self.tips_box.setWordWrap(True)
-        self.tips_box.setStyleSheet(
-            f"padding:8px 10px; border-radius:10px; background:{PANEL};"
-            f" border:1px dashed {ACCENT}; color:#dfe4ec; font-size:11px;"
-        )
-        right.addWidget(self.tips_box)
         right.addWidget(QLabel("Medio de pago"))
         right.addWidget(self.mpago)
         right.addWidget(btn_resumen)
@@ -1008,8 +996,7 @@ class POS(QWidget):
         )
         content = "\r\n".join(lines) + "\r\n\r\n"
         payload = content.encode("utf-8")
-        if CUT_COMMAND:
-            payload += CUT_COMMAND
+        cut_payload = b"\n\n\n" + CUT_COMMAND if CUT_COMMAND else b""
 
         if printer and "pdf" in printer.lower():
             pdf_path = Path.home() / "Documents" / f"Ticket_{ticket_label}.pdf"
@@ -1026,6 +1013,9 @@ class POS(QWidget):
             job = win32print.StartDocPrinter(handle, 1, ("Ticket Camelia", None, "RAW"))
             win32print.StartPagePrinter(handle)
             win32print.WritePrinter(handle, payload)
+            if cut_payload:
+                # Send cut command separately to avoid drivers queuing it before the final lines.
+                win32print.WritePrinter(handle, cut_payload)
             win32print.EndPagePrinter(handle)
             win32print.EndDocPrinter(handle)
             win32print.ClosePrinter(handle)
