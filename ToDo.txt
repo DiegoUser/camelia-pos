@@ -1,2 +1,0 @@
-Mejoras visuales app pendientes:
-- Capturas/ayuda visual: incluir iconos o mini tips en la UI.

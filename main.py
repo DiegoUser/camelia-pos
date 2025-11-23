@@ -405,6 +405,18 @@ class POS(QWidget):
         right.addWidget(QLabel("Codigo rapido / lector"))
         right.addWidget(self.code_input)
         right.addWidget(self.status_lbl)
+        self.tips_box = QLabel(
+            "Tips rapidos:\n"
+            "- Ctrl+Enter: Cobrar\n"
+            "- Ctrl+L: Ir a Codigo rapido\n"
+            "- F2: Modo kiosco; Esc para salir"
+        )
+        self.tips_box.setWordWrap(True)
+        self.tips_box.setStyleSheet(
+            f"padding:8px 10px; border-radius:10px; background:{PANEL};"
+            f" border:1px dashed {ACCENT}; color:#dfe4ec; font-size:11px;"
+        )
+        right.addWidget(self.tips_box)
         right.addWidget(QLabel("Medio de pago"))
         right.addWidget(self.mpago)
         right.addWidget(btn_resumen)
