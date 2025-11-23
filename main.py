@@ -32,6 +32,14 @@ SUMMARY_DIR = DATA_DIR / "historial" / "resumenes"
 PRINTER_NAME = os.environ.get("POS_PRINTER")
 CUT_COMMAND = b"\x1d\x56\x00"  # ESC/POS: full cut after imprimir
 
+# --- Paleta base (visual) ---
+ACCENT = "#22c8b8"
+ACCENT_DARK = "#16a796"
+BG = "#121416"
+PANEL = "#1b1d21"
+CARD_BG = "#25282d"
+CARD_HOVER = "#2d3238"
+
 
 def sanitize_pdf_text(text: str) -> str:
     return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
@@ -232,10 +240,10 @@ class ProductCard(QPushButton):
         self.setStyleSheet("""
             QPushButton {
                 text-align: left; padding: 10px; border-radius: 12px;
-                background: #3a3a3a; color: #eee;
+                background: %s; color: #e8eaef; border: 1px solid #2f343b;
             }
-            QPushButton:hover { background: #505050; }
-        """)
+            QPushButton:hover { background: %s; border-color: %s; }
+        """ % (CARD_BG, CARD_HOVER, ACCENT))
         v = QVBoxLayout(self)
         img_path = prod.get("imagen", "")
         if img_path and Path(img_path).exists():
@@ -243,7 +251,9 @@ class ProductCard(QPushButton):
             lbl = QLabel(); lbl.setPixmap(pix); lbl.setAlignment(Qt.AlignCenter)
             v.addWidget(lbl, alignment=Qt.AlignCenter)
         name = QLabel(prod["item_desc"])
+        name.setStyleSheet("font-weight:600; color:#f3f4f6;")
         price = QLabel(f"${prod['precio']:,.2f}")
+        price.setStyleSheet("color:#cdd3dd;")
         v.addWidget(name); v.addWidget(price)
         self.clicked.connect(lambda: on_add(prod, 1, False))
 
@@ -261,7 +271,7 @@ class POS(QWidget):
         self.status_lbl = QLabel("")
         self.status_lbl.setWordWrap(True)
         self.status_lbl.setStyleSheet(
-            "padding:8px; border-radius:8px; background:#252525; color:#d0d0d0;"
+            f"padding:8px; border-radius:10px; background:{PANEL}; color:#d5dbe6; border:1px solid #22262c;"
         )
         self.sales_path = None
         self.current_period = None
@@ -275,16 +285,17 @@ class POS(QWidget):
         self.generate_daily_summary(self.current_day - datetime.timedelta(days=1), mode="auto")
         log_event("Sesion POS iniciada.")
 
-        # ----- Buscador (definido ANTES de señales) -----
+        # ----- Buscador (definido ANTES de senales) -----
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Buscar producto…")
+        self.search.setPlaceholderText("Buscar producto...")
         self.search.textChanged.connect(self.apply_filters)
-        self.search.setStyleSheet("""
-            QLineEdit {
-                background:#1f1f1f; color:#ddd; border:1px solid #7a2cff;
-                border-radius:8px; padding:8px;
-            }
-        """)
+        self.search.setStyleSheet(
+            "QLineEdit {"
+            " background:#0f1114; color:#e6e9ef; border:1px solid #252a31;"
+            " border-radius:10px; padding:10px 12px;"
+            "}"
+            f"QLineEdit:focus {{ border:1px solid {ACCENT}; }}"
+        )
 
         # ----- Sidebar de categorías -----
         self.categories = ["Todas"] + sorted({p["categoria"] for p in self.prods})
@@ -293,11 +304,13 @@ class POS(QWidget):
             QListWidgetItem(c, self.cat_list)
         self.cat_list.setFixedWidth(200)
         self.cat_list.setSelectionMode(QListWidget.SingleSelection)
-        self.cat_list.setStyleSheet("""
-            QListWidget { background:#272727; color:#ddd; border:0; }
-            QListWidget::item { padding:10px; margin:6px; border-radius:10px; }
-            QListWidget::item:selected { background:#585858; color:white; }
-        """)
+        self.cat_list.setStyleSheet(
+            "QListWidget { background:%s; color:#e4e7ee; border:0; padding:6px; }"
+            "QListWidget::item { padding:10px; margin:4px; border-radius:12px; }"
+            "QListWidget::item:selected { background:%s; color:#0c1115; font-weight:600; }"
+            "QListWidget::item:hover { background:#2c3138; }"
+            % (PANEL, ACCENT)
+        )
 
         # ----- Grilla de productos (scroll) -----
         self.grid = QGridLayout()
@@ -306,7 +319,7 @@ class POS(QWidget):
 
         grid_wrap = QWidget(); grid_wrap.setLayout(self.grid)
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(grid_wrap)
-        scroll.setStyleSheet("QScrollArea { background:#202020; border:0; }")
+        scroll.setStyleSheet(f"QScrollArea {{ background:{BG}; border:0; }}")
 
         # ----- Ticket / derecha -----
         self.ticket_list = QListWidget()
@@ -317,14 +330,14 @@ class POS(QWidget):
         )
         self.ticket_list.setStyleSheet("""
             QListWidget {
-                background:#2b2b2b;
-                color:#e6e6e6;
-                border:2px solid #7a2cff;
+                background:%s;
+                color:#f1f2f5;
+                border:1px solid %s;
                 border-radius:12px;
-                padding:8px;
+                padding:10px;
             }
-            QListWidget::item { padding:4px 2px; }
-        """)
+            QListWidget::item { padding:6px 2px; }
+        """ % (PANEL, ACCENT))
 
         self.mpago = QComboBox()
         self.mpago.addItems(["Efectivo", "Tarjeta", "QR", "Debito"])
@@ -333,12 +346,13 @@ class POS(QWidget):
         self.code_input.setPlaceholderText("Codigo rapido (ID o ID*3) y Enter")
         self.code_input.returnPressed.connect(self.handle_code_entry)
         self.code_input.setStyleSheet(
-            "QLineEdit { background:#1f1f1f; color:#ddd; border:1px solid #3a3a3a; border-radius:8px; padding:6px; }"
+            "QLineEdit { background:#0f1114; color:#e6e9ef; border:1px solid #252a31; border-radius:10px; padding:8px; }"
+            f"QLineEdit:focus {{ border:1px solid {ACCENT}; }}"
         )
 
         self.total_lbl = QLabel("Total: $0.00")
         self.total_lbl.setAlignment(Qt.AlignRight)
-        self.total_lbl.setStyleSheet("color:#ddd; padding:8px;")
+        self.total_lbl.setStyleSheet("color:#f3f4f6; padding:10px; font-size:16px; font-weight:700;")
 
         btn_cobrar = QPushButton("Cobrar"); btn_cobrar.clicked.connect(self.checkout)
         btn_export = QPushButton("Exportar a Excel"); btn_export.clicked.connect(self.export_excel)
@@ -352,11 +366,19 @@ class POS(QWidget):
         self.btn_kiosk = btn_kiosk
         self.btn_bonus = btn_bonus
         for b in (btn_cobrar, btn_export, btn_resumen, btn_info, btn_clear, btn_bonus, btn_kiosk):
-            b.setMinimumHeight(36)
+            b.setMinimumHeight(40)
             b.setStyleSheet(
-                "QPushButton { background:#7a2cff; color:white; border:0; border-radius:8px; padding:8px; }"
-                "QPushButton:hover { background:#8b49ff; }"
+                "QPushButton { background:%s; color:#0c1115; border:1px solid %s; border-radius:10px; padding:10px; font-weight:600; }"
+                "QPushButton:hover { background:%s; }"
+                "QPushButton:pressed { background:%s; }"
+            % (ACCENT, ACCENT_DARK, ACCENT_DARK, "#118274")
             )
+        btn_cobrar.setStyleSheet(
+            "QPushButton { background:%s; color:#0b0f13; border:1px solid %s; border-radius:12px; padding:12px; font-weight:700; }"
+            "QPushButton:hover { background:%s; }"
+            "QPushButton:pressed { background:%s; }"
+        % ("#ffd166", "#f4b400", "#ffbe44", "#d89a00")
+        )
 
         # ----- Layouts -----
         left_panel = QVBoxLayout(); left_panel.addWidget(self.cat_list)
@@ -394,7 +416,7 @@ class POS(QWidget):
         root = QHBoxLayout(self)
         root.addWidget(splitter)
 
-        self.setStyleSheet("QWidget { background:#1b1b1b; color:#e0e0e0; }")
+        self.setStyleSheet(f"QWidget {{ background:{BG}; color:#e0e5ec; }}")
 
         # Conectar señales después de crear todo
         self.cat_list.currentTextChanged.connect(self.apply_filters)
@@ -731,7 +753,7 @@ class POS(QWidget):
         color = colors.get(level, colors["info"])
         self.status_lbl.setText(message)
         self.status_lbl.setStyleSheet(
-            "padding:8px; border-radius:8px; background:#252525; "
+            f"padding:8px; border-radius:10px; background:{PANEL}; border:1px solid #22262c; "
             f"color:{color}; font-weight:600;"
         )
 
