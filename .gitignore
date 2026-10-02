@@ -25,3 +25,10 @@ data/historial/
 *.log
 *.logs
 logs.txt
+
+# Product photos are the cafe's content (some third-party), not part of the repo.
+# Only the app icon and the placeholder are versioned.
+assets/*
+!assets/icono.ico
+!assets/icono.jpg
+!assets/not_found.png
