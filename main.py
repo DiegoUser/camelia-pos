@@ -237,7 +237,7 @@ class ProductCard(QPushButton):
         super().__init__()
         self.prod = prod
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumSize(180, 200)
+        self.setMinimumSize(170, 190)
         self.setStyleSheet("""
             QPushButton {
                 text-align: left; padding: 10px; border-radius: 12px;
@@ -311,7 +311,7 @@ class POS(QWidget):
         self.cat_list = QListWidget()
         for c in self.categories:
             QListWidgetItem(c, self.cat_list)
-        self.cat_list.setFixedWidth(200)
+        self.cat_list.setFixedWidth(180)
         self.cat_list.setSelectionMode(QListWidget.SingleSelection)
         self.cat_list.setStyleSheet(
             "QListWidget { background:%s; color:#e4e7ee; border:0; padding:6px; }"
@@ -328,6 +328,7 @@ class POS(QWidget):
 
         grid_wrap = QWidget(); grid_wrap.setLayout(self.grid)
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(grid_wrap)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet(f"QScrollArea {{ background:{BG}; border:0; }}")
 
         # ----- Ticket / derecha -----
@@ -397,6 +398,8 @@ class POS(QWidget):
 
         center_panel = QVBoxLayout(); center_panel.addWidget(self.search); center_panel.addWidget(scroll)
         center_widget = QWidget(); center_widget.setLayout(center_panel)
+        self.center_widget = center_widget
+        self.grid_cols_cache = None
 
         right = QVBoxLayout()
         right.addWidget(QLabel("Ticket actual"))
@@ -441,6 +444,18 @@ class POS(QWidget):
         if self.kiosk_enabled:
             self.apply_kiosk_mode()
 
+    def compute_grid_cols(self) -> int:
+        """Ajusta columnas segun ancho disponible para evitar scroll horizontal."""
+        # Tomamos el ancho del panel central si existe; si no, aproximamos restando sidebar y acciones.
+        base_width = self.center_widget.width() if hasattr(self, "center_widget") else self.width()
+        if not base_width:
+            base_width = max(0, self.width() - 400)
+        card_width = 170
+        spacing = self.grid.horizontalSpacing() or 0
+        total_unit = card_width + spacing
+        cols = max(1, min(4, base_width // total_unit if total_unit else 2))
+        return cols
+
     # ---- Render y filtros ----
     def apply_filters(self):
         cat = self.cat_list.currentItem().text() if self.cat_list.currentItem() else "Todas"
@@ -457,7 +472,8 @@ class POS(QWidget):
         for i in reversed(range(self.grid.count())):
             w = self.grid.itemAt(i).widget()
             if w: w.setParent(None)
-        cols = 3
+        cols = self.compute_grid_cols()
+        self.grid_cols_cache = cols
         for idx, p in enumerate(items):
             r, c = divmod(idx, cols)
             self.grid.addWidget(ProductCard(p, self.add_item), r, c)
@@ -498,6 +514,13 @@ class POS(QWidget):
     def closeEvent(self, event):
         log_event("Sesion POS finalizada.")
         super().closeEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        new_cols = self.compute_grid_cols()
+        if new_cols != self.grid_cols_cache:
+            # Re-render con el ancho nuevo para evitar scroll horizontal.
+            self.apply_filters()
 
     def focus_code_input(self):
         self.code_input.setFocus()
