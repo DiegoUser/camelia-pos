@@ -1,9 +1,75 @@
 item_id,item_desc,categoria,precio,activo,imagen
-CAF_CHICO,Café chico,Bebidas,120.00,1,assets/cafe_chico.png
-MED_2U,Medialunas x2,Panadería,250.00,1,assets/medialunas.jpg
-CAF_CHICO,Café chico,Bebidas,120.00,1,assets/cafe_chico.png
-MED_2U,Medialunas x2,Panadería,250.00,1,assets/medialunas.jpg
-CAF_CHICO,Café chico,Bebidas,120.00,1,assets/cafe_chico.png
-MED_2U,Medialunas x2,Panadería,250.00,1,assets/medialunas.jpg
-CAF_CHICO,Café chico,Bebidas,120.00,1,assets/cafe_chico.png
-MED_2U,Medialunas x2,Panadería,250.00,1,assets/medialunas.jpg
+
+CAF_ESPRESSO,Espresso,Bebidas Calientes,100.00,1,assets/espresso.jpg
+CAF_DOBLEESPRESSO,Espresso Doble,Bebidas Calientes,150.00,1,assets/espressodoble.jpg
+CAF_AMERICANO,Americano,Bebidas Calientes,135.00,1,assets/americano.jpg
+CAF_CORTADO,Cortado,Bebidas Calientes,160.00,1,assets/cortado.jpg
+CAF_LATTE, Cafe Latte,Bebidas Calientes,180.00,1,assets/latte.jpg
+CAF_LATTEVAINILLA,Cafe Latte Vainilla,Bebidas Calientes,195.00,1,assets/lattevainilla.jpg
+CAF_CAPUCHINO,Capuchino,Bebidas Calientes,180.00,1,assets/capuccino.jpg
+CAF_CAPUCHINOPUMP,Capuchino Pumpkin,Bebidas Calientes,220.00,1,assets/capuccinopumpkin.jpg
+CAF_FLAT,FLat White,Bebidas Calientes,200.00,1,assets/flatwhite.jpg
+CAF_FLATVAINILLA,FLat White Vainilla,Bebidas Calientes,225.00,1,assets/flatwhite.jpg
+CAF_SUB,Submarino,Bebidas Calientes,160.00,1,assets/Submarino.jpg
+TE_TW,Te Twining,Bebidas Calientes,100.00,1,assets/Tetwining.jpg
+
+CAF_AMERICANOICE,Americano ICE,Bebidas Frias,105.00,1,assets/americanoice.jpg
+CAF_AFFOGATO,Affogato,Bebidas Frias,200.00,1,assets/affogato.jpg
+CAF_VAINILLAICE,Vainilla ICE,Bebidas Frias,180.00,1,assets/cafevainillaice.jpg
+CAF_CARAMELOICE,Caramelo ICE,Bebidas Frias,180.00,1,assets/cafevainillaice.jpg
+AGUA_SALUS,Agua Salus 600,Bebidas Frias,95.00,1,assets/Aguasalus.jpg
+PEP_LATA,Pepsi Lata,Bebidas Frias,120.00,1,assets/Pepsi.jpg
+
+DETOX_2,Detox Limon apio y manzana,Bebidas Frias,210.00,1,assets/Detoxl.jpg
+DETOX_1,Detox Apio manzana y zanahoria,Bebidas Frias,215.00,1,assets/Detox.jpg
+JUG_NAR_1,Jugo de Naranja 250,Bebidas Frias,140.00,1,assets/Jugodenaranja.jpg
+JUG_NAR_2,Jugo de Naranja 500,Bebidas Frias,190.00,1,assets/Jugodenaranja.jpg
+LIMON_1,Limonada 250,Bebidas Frias,130.00,1,assets/Limonada.jpg
+LIMON_2,Limonada 500,Bebidas Frias,180.00,1,assets/Limonada.jpg
+LICU_BAN,Licuado de Banana,Bebidas Frias,200.00,1,assets/Licuadodebanana.jpg
+LICU_FRU,Licuado de Frutilla,Bebidas Frias,180.00,1,assets/Licuadodefrutilla.jpg
+
+AVO_TOAST,Avocado Toast,Brunch,300.00,1,assets/AvocadoToast.jpg
+BAGEL_RELLENO,Bagel Relleno,Brunch,270.00,1,assets/Bagelrelleno.jpg
+HUE_REV,Huevos Revueltos,Brunch,100.00,1,assets/Huevosrevueltos.jpg
+
+ALM_TARTA,Tarta de el dia y Ensalada,Almuerzo,260.00,1,assets/tarta.jpg
+ALM_WRAP,Wrap de Pollo,Almuerzo,270.00,1,assets/Wrapdepollo.jpg
+ALM_WRAPAVO,Wrap Avocado,Almuerzo,270.00,1,assets/Wrapavocado.jpg
+ALM_POKE,Poke de Pollo,Almuerzo,390.00,1,assets/Pokedepollo.jpg
+ALM_OMELE,Omellete relleno de queso y ensalada,Almuerzo,260.00,1,assets/omelete.jpg
+ALM_MENU_1,Menu del dia y bebida,Almuerzo,280.00,1,assets/Menu.jpg
+ALM_MENU_2,Menu del dia bebida y cookie,Almuerzo,330.00,1,assets/Menu.jpg
+ALM_MENU_3,Menu del dia,Almuerzo,230.00,1,assets/Menu.jpg
+ALM_HAMB,Hamburguesa Vegetariana con papas rusticas,Almuerzo,350.00,1,assets/Hamburguesa.jpg
+ALM EMP,Empanada,Almuerzo,95.00,1,assets/empanada.jpg
+ALM TARTA_1,Tarta Napolita o zapallito,Almuerzo,185.00,1,assets/tarta.jpg
+ALM TARTA_2,Tarta pollo y espinaca,Almuerzo,200.00,1,assets/tarta.jpg
+
+PROM_1,Capuccino y 2 chipa de queso,Promos,240.00,1,assets/capuychipa.jpg
+PROM_2,Americano y 2 medialunas,Promos,220,1,assets/americanoymedialuna.jpg
+PROM_3,2 Empanada y bebida,Promos,275,1,assets/empanada.jpg
+PROM_4,Tarta y bebida,Promos,275,1,assets/tarta.jpg
+PROM_5,Merienda para dos,Promos,980,1,assets/Meriendaparados.jpg
+
+DULC_1,Alfajor Maicena,Dulce,60,1,assets/Maicena.jpg
+DULC_2,Alfajor Chocolate,Dulce,70,1,assets/Alfachoco.jpg
+DULC_3,Pasta Frola,Dulce,60,1,assets/Frola.jpg
+DULC_4,Medialuna x2,Dulce,100,1,assets/Medialunas.jpg
+DULC_12,Medialuna dulce grande,Dulce,90,1,assets/Medialuna.jpg
+DULC_5,Cookie chispas,Dulce,80,1,assets/cookiechispa.jpg
+DULC_6,Cookie NY,Dulce,130,1,assets/CookieNewYork.jpg
+DULC_7,Cookies Avena x2,Dulce,80,1,assets/cookieavena.jpg
+DULC_8,Roll de canela,Dulce,120,1,assets/roll.jpg
+DULC_9,Roll de canela con DDL,Dulce,140,1,assets/rollddl.jpg
+DULC_10,Medialuna Dulce Rellena,Dulce,150,1,assets/Medialunadulcerellena.jpg
+DULC_11,Torta de el dia,Dulce,300,1,assets/torta.jpg
+DULC_13,Ensalada de fruta,Dulce,100,1,assets/ensaladafruta.jpg
+
+SAL_1,Scon de queso,Salado,80,1,assets/Scon.jpg
+SAL_2,Chipa,Salado,80,1,assets/Chipa.jpg
+SAL_3,Tostado de Jamon y Queso,Salado,250,1,assets/Tostado.jpg
+SAL_4,Medialuna Rellena,Salado,150,1,assets/Medialunarellena.jpg
+SAL_5,Roll de queso,Salado,140,1,assets/rollqueso.jpg
+SAL_6,Pan de Nuez,Salado,260,1,assets/pandenuez.jpg
+
