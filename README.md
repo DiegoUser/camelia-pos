@@ -1,104 +1,65 @@
-# Cafeteria POS
+# Camelia POS
 
-Sistema de gestion de pedidos para cafeterias pequenas.
-Aplicacion de escritorio desarrollada en **Python + PySide6**, con persistencia en archivos CSV mensuales y exportacion a Excel.
+A point-of-sale desktop app built for a small café in Uruguay. It runs on the counter PC, fully offline: tap products into a ticket, apply discounts, take payment, print the ticket on a thermal printer, and close the day with an Excel summary.
 
----
+![Point of sale at 1024×768](docs/pos.png)
 
-## Caracteristicas actuales
+> The UI and the user manual ([Manual_Camelia_POS.pdf](Manual_Camelia_POS.pdf)) are in Spanish, for the café staff. Product photos are the café's content and are not part of this repository; products without a photo render as text-only cards.
 
-- Interfaz grafica moderna y simple.
-- Menu lateral de categorias con grilla de productos con imagenes.
-- Ticket editable: se pueden cambiar cantidades, quitar items, limpiar todo y aplicar descuentos generales o por producto.
-- Ticket con calculo automatico de totales, bonificaciones y seleccion de medio de pago.
-- Confirmacion de cobro antes de guardar cada venta.
-- Validacion de productos y precios (sin nombres vacios ni valores menores o iguales a 0).
-- Control automatico del CSV mensual (detecta cambio de mes y reinicia IDs).
-- Persistencia de ventas en archivos CSV mensuales.
-- Backup diario del CSV activo en `data/historial/backups`.
-- Resumen automatico de fin de dia (Excel) con boton manual.
-- Exportacion a Excel (.xlsx) con hoja de resumen por categoria.
-- Registro de errores en `logs.txt` (con traceback) para soporte rapido.
-- Indicador de estado permanente (exito/error) visible para el cajero.
-- Codigo rapido / lector: escribir `ITEM_ID` o `ITEM_ID*3` y Enter.
-- Atajos: `Ctrl+Enter` (cobrar), `Ctrl+E` (exportar), `Ctrl+R` (resumen), `Ctrl+L` (codigo rapido), `F1` (info/atajos), `F2` (modo kiosco), `Esc` (salir de kiosco).
-- Boton de ayuda/atajos (o `F1`) con listado rapido para el personal.
-- Ticket impreso con bordes, detalle de descuentos aplicados y comando de corte automatico (ESC/POS) al final.
-- Modo kiosco a pantalla completa (boton dedicado o tecla `F2`, salir con `Esc`).
-- Impresion automatica al cobrar (requiere `pywin32` y una impresora configurada; se usa la definida en `POS_PRINTER` o la predeterminada de Windows. Si la predeterminada es “Microsoft Print to PDF”, se guarda un PDF en la carpeta Documentos).
-- IDs de ticket continuos entre sesiones.
-- Ejecutable portable (PyInstaller).
+## The problem
 
----
+The café was taking orders by hand. It needed something the staff could learn in minutes, that would keep working without internet, and that the owner could reconcile at the end of the day — on a modest counter PC with a 1024×768 screen and a thermal printer.
 
-## Estructura del proyecto
+## Features
 
-```
-app/
-+-- main.py
-+-- data/
-|   +-- productos.csv
-|   +-- historial/
-|       +-- ventas_YYYY-MM.csv
-|       +-- backups/
-|           +-- ventas_YYYY-MM-DD.csv
-|       +-- resumenes/
-|           +-- resumen_YYYY-MM-DD_auto.xlsx
-+-- assets/
-    +-- cafe_chico.jpg
-    +-- medialunas.jpg
-```
+- **Product grid by category**, with search and a quick-entry box for barcode readers or keyboard: type `ITEM_ID` or `ITEM_ID*3` and Enter.
+- **Editable ticket**: change quantities, remove items, discounts per product or for the whole ticket.
+- **Payment confirmation** before a sale is saved, with the payment method.
+- **Thermal ticket printing** over ESC/POS through the Windows spooler, with an automatic paper cut. The printer is the system default or the one named in `POS_PRINTER`.
+- **Daily Excel summary** with totals per category, generated automatically or on demand.
+- **Automatic daily backup** of the sales file.
+- **Kiosk mode** (full screen) and keyboard shortcuts for every frequent action (`F1` lists them).
+- **Portable**: a single `.exe` that creates its data folders next to itself. Copy the folder and it runs.
 
----
+## Design decisions
 
-## Instalacion y ejecucion
+**Plain files instead of a database.** Sales are appended to one CSV per month, products live in an editable CSV. For one counter PC this is easy to back up, easy for the owner to open in Excel, and has nothing to install or maintain. Each sale is written with `flush` + `fsync`, so a power cut loses at most the line being written.
 
-1. Instalar dependencias:
+**Offline by design.** No network, no server, no accounts. A café counter cannot stop selling because the internet is down, and a system with nothing exposed has nothing to attack remotely.
 
-```bash
-pip install PySide6 pandas openpyxl pillow
-pip install pywin32
-```
+**Built for the staff, not for the developer.** Every failure ends in a visible status message for the cashier and a full traceback in `logs.txt`, which is created at startup so the staff can send it when something goes wrong. Invalid products in the CSV are skipped and reported instead of crashing the app.
 
-2. Ejecutar:
+**Fits the real screen.** The product grid computes its columns from the available width, so at the counter's 1024×768 it never needs horizontal scrolling.
 
-```bash
+## Getting started
+
+Requirements: Windows, Python 3.10+.
+
+```powershell
+python -m pip install -r requirements.txt
 python main.py
 ```
 
-3. Empaquetar a `.exe`:
+On first run the app creates `data/historial/` for monthly sales, backups and summaries. Products are read from `data/productos.csv` (`item_id,item_desc,categoria,precio,activo,imagen`).
 
-```bash
+### Build the executable
+
+```powershell
 pip install pyinstaller
 pyinstaller --clean --name Camelia --onefile --noconsole --icon assets/icono.ico --add-data "data;data" --add-data "assets;assets" --version-file version_info.txt main.py
 ```
 
-4. Logs de errores: se generan automaticamente en `logs.txt` junto al ejecutable (o en la carpeta donde se copie el `.exe`). El archivo queda creado desde el arranque para que el staff lo pueda compartir ante incidentes. Todos los archivos (data/, assets/, backups, resumenes) se crean en la misma carpeta del ejecutable para facilitar su respaldo.
-5. Opcional: definir la variable de entorno `POS_PRINTER` si se quiere forzar una impresora distinta a la predeterminada de Windows (por defecto se usa la impresora por defecto del sistema).
+## Known limitations
 
----
+| Situation | Current behavior |
+|-----------|------------------|
+| Two instances writing at the same time | Not supported: they could interleave writes to the same CSV. One counter, one instance. |
+| Interrupted while saving a multi-line sale | Lines already written stay; there is no rollback. The confirmation step before saving reduces the window. |
+| Products CSV edited with wrong headers or types | Invalid rows are skipped and reported; the Excel export may fail on malformed data. |
+| Excel file open while exporting | The export fails with a clear error. |
+| Ticket numbers | Restart every month, because they are tied to the monthly sales file. |
+| Discounts | Any cashier can apply them; there is no supervisor approval. |
 
-## Posibles fallos actuales y limitaciones
+## License
 
-| Situacion | Comportamiento actual | Riesgo / mejora posible |
-|-----------|----------------------|-------------------------|
-| Corte de energia durante escritura | Puede truncar ultima linea si no termino el fsync | Mitigado con flush/fsync, pero no garantiza 100% |
-| CSV manualmente editado | Si se cambian encabezados o tipos, el export a Excel puede fallar | Validar CSV antes de leer (en proceso) |
-| Productos sin imagen | Muestra boton vacio | OK visual, pero confunde |
-| Multiples usuarios abriendo la app al mismo tiempo | Pueden pisarse al escribir CSV | No soportado aun |
-| Rutas con caracteres raros | Puede fallar en Windows | Normalizar paths |
-| Ticket vacio y se presiona Cobrar | Mensaje, pero no bloquea ticket_id | Menor |
-| No hay rollback si se interrumpe entre filas | Se guardan parciales | Confirmacion previa reduce el riesgo, pero no hay rollback |
-| Excel abierto mientras se intenta exportar | Falla de permiso | Capturado con error |
-| Backups automaticos diarios | Se generan en `data/historial/backups` al primer uso del dia | Revisar el espacio disponible y copiar fuera de la PC |
-| Resumenes automaticos | Se crean/actualizan en `data/historial/resumenes` (archivos .xlsx) | Consultar estos archivos para el arqueo diario |
-| Ticket ID se basa en archivo mensual | Reinicia cada mes | Comportamiento esperado, documentado |
-
----
-
-## Licencia y creditos
-
-Desarrollado como prototipo para gestion de caja en cafeterias locales.
-Autor: *[Diego Mendez]*
-Version: **MVP 1.0**
-
+[MIT](LICENSE)
