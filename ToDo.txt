@@ -1,1 +1,0 @@
-la resolucion de la pantalla del cliente es 1024 x 768, tenemos que hacer que se vea bien para esa resolucion (actualmente la seccion del medio queda con scroll horizontal, no deberia)
